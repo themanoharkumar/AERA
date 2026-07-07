@@ -1,4 +1,7 @@
 app:
   name: AERA
-  environment: development
-  log_level: INFO
+  version: 0.1.0
+  debug: true
+
+logging:
+  level: INFO

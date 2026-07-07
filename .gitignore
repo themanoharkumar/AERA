@@ -1,11 +1,33 @@
+# Virtual Environment
+.venv/
+
+# Python
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
-*.egg-info/
-.venv/
-venv/
-.env
+
+# VS Code
+.vscode/
+
+# Logs
+logs/
+
+# Database
+*.db
+
+# Storage
+storage/clips/
+storage/screenshots/
+storage/reports/
+
+# Models
+models/trained/
+models/checkpoints/
+
+# Pytest
 .pytest_cache/
-.mypy_cache/
-.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environment
+.env
