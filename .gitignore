@@ -7,7 +7,7 @@ __pycache__/
 
 # VS Code
 .vscode/
-
+docs/
 # Logs
 logs/
 
