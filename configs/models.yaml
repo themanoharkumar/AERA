@@ -1,0 +1,5 @@
+models:
+  fire_detector: "models/pretrained/fire.pt"
+  smoke_detector: "models/pretrained/smoke.pt"
+  fall_detector: "models/pretrained/fall.pt"
+  intrusion_detector: "models/pretrained/intrusion.pt"

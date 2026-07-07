@@ -1,0 +1,6 @@
+camera:
+  source: "0"
+  frame_rate: 15
+  resolution:
+    width: 1280
+    height: 720

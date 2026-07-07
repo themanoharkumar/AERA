@@ -1,0 +1,7 @@
+services:
+  aera:
+    build: .
+    container_name: aera
+    volumes:
+      - .:/app
+    command: python main.py
