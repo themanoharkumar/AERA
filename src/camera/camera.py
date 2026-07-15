@@ -20,12 +20,12 @@ class CameraStatus(str, Enum):
         RECONNECTING: System is trying to re-establish a lost connection.
     """
 
-    REGISTERED = "REGISTERED"
-    CONNECTING = "CONNECTING"
-    CONNECTED = "CONNECTED"
-    STREAMING = "STREAMING"
-    DISCONNECTED = "DISCONNECTED"
-    RECONNECTING = "RECONNECTING"
+    REGISTERED = "registered"
+    CONNECTING = "connecting"
+    CONNECTED = "connected"
+    STREAMING = "streaming"
+    DISCONNECTED = "disconnected"
+    RECONNECTING = "reconnecting"
 
 
 class Camera:
@@ -56,7 +56,9 @@ class Camera:
         self.camera_id = camera_id
         self.name = name
         self.source = source
+        # TODO: Future versions may replace this dictionary with a structured CameraConfig class.
         self.config = config if config is not None else {}
+        # TODO: Future versions may replace this dictionary with a structured CameraStatistics class.
         self.metadata = metadata if metadata is not None else {}
         self.status = CameraStatus.REGISTERED
 

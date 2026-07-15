@@ -107,6 +107,7 @@ class CameraHealthMonitor:
 
             # Retrieve internal stream object
             # Note: Accessing internal _streams is safe inside the package
+            # TODO: Future versions should expose public accessor methods instead of accessing internal registries directly.
             stream = self.manager._streams.get(camera_id)
             if stream is None:
                 logger.warning("Stream object missing for registered camera '%s'", camera_id)
@@ -145,6 +146,7 @@ class CameraHealthMonitor:
             # 2. Frozen Stream Check
             # Check if frame timestamp changed. If it didn't, it is covered by timeout.
             # If the timestamp DID change, check if the frame pixels are identical.
+            # TODO: Future versions should improve frozen frame detection by combining: timestamps, frame count, successful reads, and frame similarity.
             is_frozen = False
             if camera_id in self._last_frames and timestamp != last_timestamp:
                 prev_frame = self._last_frames[camera_id]
@@ -203,6 +205,7 @@ class CameraHealthMonitor:
             )
             # Reconnection: Set status to RECONNECTING and restart camera in a separate thread
             # to avoid blocking the health monitor loop.
+            # TODO: Future versions should expose public accessor methods instead of accessing internal registries directly.
             camera = self.manager._cameras.get(camera_id)
             if camera is not None:
                 camera.status = CameraStatus.RECONNECTING

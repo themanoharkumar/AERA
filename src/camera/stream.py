@@ -254,7 +254,9 @@ class CameraStream:
             Returns (0.0, None) if no frame has been read yet.
         """
         with self._lock:
-            return self._latest_timestamp, self._latest_frame
+            if self._latest_frame is None:
+                return 0.0, None
+            return self._latest_timestamp, self._latest_frame.copy()
 
     def is_connected(self) -> bool:
         """Check if the stream is currently connected.
