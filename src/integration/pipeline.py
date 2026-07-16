@@ -11,6 +11,7 @@ import cv2
 import numpy as np
 
 from src.alert.alert import Alert
+from src.camera.camera import CameraStatus
 from src.event.types import EventType
 from src.event.priority import EventPriority
 from src.evidence.metadata import EvidenceMetadata
@@ -48,6 +49,16 @@ class EmergencyPipeline:
         Raises:
             PipelineError: If camera fails or pipeline execution encounters errors.
         """
+        # Verify camera exists and is active/streaming
+        try:
+            status = self.coordinator.camera_manager.camera_status(camera_id)
+            if status != CameraStatus.STREAMING:
+                raise PipelineError(f"Camera failure: Camera '{camera_id}' is not in STREAMING status (current: {status.value}).")
+        except Exception as e:
+            if isinstance(e, PipelineError):
+                raise
+            raise PipelineError(f"Camera failure: Camera '{camera_id}' not found or invalid: {e}") from e
+
         if frame is None or not isinstance(frame, np.ndarray):
             logger.error("Invalid frame received for camera %s", camera_id)
             raise PipelineError(f"Camera failure: Invalid frame received for camera '{camera_id}'.")

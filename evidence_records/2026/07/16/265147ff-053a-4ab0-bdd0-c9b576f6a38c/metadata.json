@@ -1,0 +1,16 @@
+{
+    "camera_id": "test_e2e_cam",
+    "event_id": "265147ff-053a-4ab0-bdd0-c9b576f6a38c",
+    "decision_id": "5ddc0840-6bf8-4649-90f8-9ff6ab1aa4e1",
+    "timestamp": 1784212792.0115185,
+    "detector_name": "fire_detector",
+    "file_size": 2350,
+    "resolution": [
+        100,
+        100
+    ],
+    "custom_metadata": {
+        "detector_confidence": 0.99,
+        "label": "fire"
+    }
+}

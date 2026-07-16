@@ -1,0 +1,16 @@
+{
+    "camera_id": "cam_thread_2",
+    "event_id": "354236d1-c012-4eea-8775-7b910c1cc93b",
+    "decision_id": "cda2abc2-f8fc-408f-a8cf-2e346148a6b0",
+    "timestamp": 1784212827.715184,
+    "detector_name": "fire_detector",
+    "file_size": 2350,
+    "resolution": [
+        100,
+        100
+    ],
+    "custom_metadata": {
+        "detector_confidence": 0.99,
+        "label": "fire"
+    }
+}

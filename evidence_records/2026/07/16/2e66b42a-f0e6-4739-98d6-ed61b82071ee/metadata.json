@@ -1,0 +1,16 @@
+{
+    "camera_id": "cam_offline",
+    "event_id": "2e66b42a-f0e6-4739-98d6-ed61b82071ee",
+    "decision_id": "6d428be9-7b2b-4968-9787-4b9c8b5a8fdf",
+    "timestamp": 1784212968.3637786,
+    "detector_name": "fire_detector",
+    "file_size": 2350,
+    "resolution": [
+        100,
+        100
+    ],
+    "custom_metadata": {
+        "detector_confidence": 0.99,
+        "label": "fire"
+    }
+}

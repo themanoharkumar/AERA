@@ -1,0 +1,10 @@
+{
+    "camera_manager": "healthy",
+    "detection_pipeline": "healthy",
+    "event_manager": "healthy",
+    "decision_engine": "healthy",
+    "evidence_manager": "healthy",
+    "report_manager": "healthy",
+    "alert_manager": "healthy",
+    "integration_layer": "healthy"
+}

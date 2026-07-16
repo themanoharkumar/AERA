@@ -154,7 +154,7 @@ class CameraStream:
 
     def _capture_loop(self) -> None:
         """Background thread target to continuously read frames from OpenCV stream."""
-        target_fps = self.config.get("frame_rate")
+        target_fps = self.config.get("frame_rate", 30.0)
         frame_delay = 1.0 / target_fps if (isinstance(target_fps, (int, float)) and target_fps > 0) else 0.0
 
         logger.debug("Starting stream capture loop for source: %s", self.source)
