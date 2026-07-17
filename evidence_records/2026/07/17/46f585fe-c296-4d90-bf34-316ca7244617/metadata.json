@@ -1,0 +1,13 @@
+{
+    "camera_id": "webcam_0",
+    "event_id": "46f585fe-c296-4d90-bf34-316ca7244617",
+    "decision_id": "d5e6c9c3-d373-4a07-abc9-f988c441b21f",
+    "timestamp": 1784286540.6911628,
+    "detector_name": "AI_Manual_Compile",
+    "file_size": 0,
+    "resolution": [
+        0,
+        0
+    ],
+    "custom_metadata": {}
+}

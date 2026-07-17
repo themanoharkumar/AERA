@@ -8,9 +8,11 @@ import streamlit as st
 import logging
 import threading
 import time
+import datetime
 from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import cv2
+import pandas as pd
 
 from src.integration.coordinator import SystemCoordinator
 from src.integration.pipeline import EmergencyPipeline
@@ -221,9 +223,12 @@ class BackendGateway:
     def update_incident_status(self, event_id: str, status_str: str) -> Tuple[bool, str]:
         """Update the operational status of an incident."""
         try:
-            status_enum = EventStatus(status_str.upper())
+            val_str = status_str.upper()
+            if val_str == "CLOSED":
+                val_str = "RESOLVED"
+            status_enum = EventStatus(val_str)
             self.coordinator.event_manager.update_event(event_id, status=status_enum)
-            return True, f"Incident {event_id} status updated to {status_str}."
+            return True, f"Incident {event_id} status updated to {status_enum.value}."
         except Exception as e:
             logger.error("Failed to update status for event %s: %s", event_id, e)
             return False, f"Update failed: {e}"
@@ -333,9 +338,9 @@ class BackendGateway:
                 return False, f"Simulation aborted: Camera '{camera_id}' is not actively streaming."
 
             frame = np.zeros((100, 100, 3), dtype=np.uint8)
-            if incident_type == "FIRE":
+            if incident_type.upper() == "FIRE":
                 frame[10:90, 10:90, 2] = 250
-            elif incident_type == "SMOKE":
+            elif incident_type.upper() == "SMOKE":
                 frame[:, :, :] = 150
             
             # Feed frame to pipeline synchronously
@@ -347,6 +352,311 @@ class BackendGateway:
         except Exception as e:
             logger.error("Simulation trigger failed: %s", e)
             return False, f"Simulation trigger failed: {e}"
+
+    # ── Additional Required Integration & Refactoring APIs ────────────────
+
+    def get_cameras(self) -> List[Camera]:
+        """Alias for listing all registered cameras."""
+        return self.list_cameras()
+
+    def restart_camera(self, camera_id: str) -> Tuple[bool, str]:
+        """Restart a camera stream cleanly by stopping and starting it."""
+        try:
+            self.stop_camera(camera_id)
+            time.sleep(0.1)
+            return self.start_camera(camera_id)
+        except Exception as e:
+            logger.error("Restart camera failed for %s: %s", camera_id, e)
+            return False, f"Restart failed: {e}"
+
+    def update_incident(self, event_id: str, **kwargs: Any) -> Tuple[bool, str]:
+        """Update fields of an existing event incident."""
+        try:
+            self.coordinator.event_manager.update_event(event_id, **kwargs)
+            return True, f"Incident {event_id} updated successfully."
+        except Exception as e:
+            logger.error("Update incident failed for %s: %s", event_id, e)
+            return False, f"Update failed: {e}"
+
+    def close_incident(self, event_id: str) -> Tuple[bool, str]:
+        """Close an incident lifecycle state."""
+        return self.update_incident_status(event_id, "CLOSED")
+
+    def delete_incident(self, event_id: str) -> Tuple[bool, str]:
+        """Delete an incident from registry."""
+        try:
+            self.coordinator.event_manager.delete_event(event_id)
+            return True, f"Incident {event_id} deleted successfully."
+        except Exception as e:
+            logger.error("Delete incident failed for %s: %s", event_id, e)
+            return False, f"Delete failed: {e}"
+
+    def get_evidence(self) -> List[Evidence]:
+        """Retrieve all active evidence packages (resolves Evidence page calls)."""
+        return self.get_evidence_list()
+
+    def get_evidence_by_event(self, event_id: str) -> Optional[Evidence]:
+        """Retrieve evidence package associated with an event ID."""
+        return self.get_evidence_for_event(event_id)
+
+    def open_evidence(self, evidence_id: str) -> Optional[Evidence]:
+        """Retrieve a specific evidence package by its ID."""
+        try:
+            packages = self.coordinator.evidence_manager.list_evidence()
+            for p in packages:
+                if p.evidence_id == evidence_id:
+                    return p
+            return None
+        except Exception:
+            return None
+
+    def export_evidence(self, evidence_id: str) -> Tuple[bool, str]:
+        """Export serialized evidence metadata details."""
+        try:
+            pkg = self.open_evidence(evidence_id)
+            if pkg:
+                import json
+                from dataclasses import asdict
+                return True, json.dumps(asdict(pkg), indent=4)
+            return False, "Evidence package not found."
+        except Exception as e:
+            return False, f"Export failed: {e}"
+
+    def create_report_for_event(self, event_id: str) -> Tuple[bool, Any]:
+        """Compile a new incident report for an existing event manually."""
+        try:
+            # 1. Fetch Event
+            event = self.coordinator.event_manager.get_event(event_id)
+            
+            # 2. Check if report already exists for this event
+            existing_reports = self.coordinator.report_manager.list_reports()
+            for rep in existing_reports:
+                if rep.event_id == event_id:
+                    return True, rep
+                    
+            # 3. Check or generate DecisionResult
+            decision_result = self.coordinator.decision_engine.evaluate_event(event)
+            
+            # 4. Check or generate Evidence package
+            evidence = self.coordinator.evidence_manager.get_evidence(event_id)
+            if evidence is None:
+                # Create default Evidence package
+                from src.evidence.metadata import EvidenceMetadata
+                metadata = EvidenceMetadata(
+                    camera_id=event.camera_id,
+                    event_id=event_id,
+                    decision_id=decision_result.decision_id,
+                    timestamp=event.timestamp,
+                    detector_name="AI_Manual_Compile",
+                    file_size=0,
+                    resolution=(0, 0),
+                    custom_metadata={}
+                )
+                evidence = self.coordinator.evidence_manager.create_evidence(
+                    event_id=event_id,
+                    decision_id=decision_result.decision_id,
+                    metadata=metadata,
+                    image_data=b"",
+                    video_data=None
+                )
+                
+            # 5. Generate report
+            report = self.coordinator.report_manager.generate_report(
+                decision=decision_result,
+                evidence=evidence
+            )
+            return True, report
+        except Exception as e:
+            logger.exception("Failed to manually compile report for event %s: %s", event_id, e)
+            return False, f"Report compilation failed: {e}"
+
+    def export_report(self, report_id: str) -> Tuple[bool, str]:
+        """Export serialized report contents."""
+        try:
+            report = self.get_report(report_id)
+            if report:
+                exported = self.coordinator.report_manager.export_report(report_id)
+                return True, exported
+            return False, "Report not found."
+        except Exception as e:
+            logger.error("Failed to export report %s: %s", report_id, e)
+            return False, f"Export failed: {e}"
+
+    def retry_alert(self, alert_id: str) -> Tuple[bool, str]:
+        """Re-trigger alert delivery dispatch for a report."""
+        try:
+            alert = self.coordinator.alert_manager.get_alert(alert_id)
+            if not alert:
+                return False, "Alert ID not found in cache."
+            report = self.get_report(alert.report_id)
+            if not report:
+                return False, f"Report '{alert.report_id}' not found."
+            self.coordinator.alert_manager.trigger_alert(report)
+            return True, "Alert successfully re-dispatched."
+        except Exception as e:
+            logger.error("Retry alert delivery failed for %s: %s", alert_id, e)
+            return False, f"Alert dispatch failed: {e}"
+
+    # ── Analytics & Aggregation Services ──────────────────────────────────
+
+    def get_incident_trends(self) -> pd.DataFrame:
+        """Compile a pandas DataFrame tracking incident counts aggregated by day and category."""
+        try:
+            events = self.coordinator.event_manager.list_events()
+            if not events:
+                return pd.DataFrame(columns=["date", "count", "type"])
+            
+            records = []
+            for e in events:
+                date_str = datetime.datetime.fromtimestamp(e.timestamp).strftime("%Y-%m-%d")
+                records.append({"date": date_str, "type": e.event_type.value, "count": 1})
+            df = pd.DataFrame(records)
+            df = df.groupby(["date", "type"]).sum().reset_index()
+            return df
+        except Exception as e:
+            logger.error("Failed to compile incident trends: %s", e)
+            return pd.DataFrame(columns=["date", "count", "type"])
+
+    def get_incident_distribution(self) -> pd.DataFrame:
+        """Compile a pandas DataFrame tracking incident counts grouped by type category."""
+        try:
+            events = self.coordinator.event_manager.list_events()
+            if not events:
+                return pd.DataFrame(columns=["type", "count"])
+            records = [{"type": e.event_type.value, "count": 1} for e in events]
+            df = pd.DataFrame(records)
+            df = df.groupby("type").sum().reset_index()
+            return df
+        except Exception as e:
+            logger.error("Failed to compile incident distribution: %s", e)
+            return pd.DataFrame(columns=["type", "count"])
+
+    def get_alert_statistics(self) -> pd.DataFrame:
+        """Compile a pandas DataFrame aggregating alerts by dispatch state."""
+        try:
+            alerts = self.coordinator.alert_manager.list_alerts()
+            if not alerts:
+                return pd.DataFrame(columns=["status", "count"])
+            records = [{"status": a.status.lower(), "count": 1} for a in alerts]
+            df = pd.DataFrame(records)
+            df = df.groupby("status").sum().reset_index()
+            return df
+        except Exception as e:
+            logger.error("Failed to compile alert statistics: %s", e)
+            return pd.DataFrame(columns=["status", "count"])
+
+    def get_camera_uptime_stats(self) -> pd.DataFrame:
+        """Compile camera uptime telemetry percentages based on active status."""
+        try:
+            cameras = self.coordinator.camera_manager.list_cameras()
+            if not cameras:
+                return pd.DataFrame(columns=["camera", "uptime"])
+            records = []
+            for c in cameras:
+                uptime = 100.0 if c.status == CameraStatus.STREAMING else (50.0 if c.status == CameraStatus.CONNECTED else 0.0)
+                records.append({"camera": c.name, "uptime": uptime})
+            return pd.DataFrame(records)
+        except Exception as e:
+            logger.error("Failed to compile camera uptime stats: %s", e)
+            return pd.DataFrame(columns=["camera", "uptime"])
+
+    def get_camera_statistics(self) -> Dict[str, Any]:
+        """Aggregate total count statuses across registered camera feeds."""
+        try:
+            cameras = self.coordinator.camera_manager.list_cameras()
+            return {
+                "total": len(cameras),
+                "streaming": sum(1 for c in cameras if c.status == CameraStatus.STREAMING),
+                "connected": sum(1 for c in cameras if c.status == CameraStatus.CONNECTED),
+                "disconnected": sum(1 for c in cameras if c.status == CameraStatus.DISCONNECTED),
+            }
+        except Exception as e:
+            logger.error("Failed to get camera statistics: %s", e)
+            return {"total": 0, "streaming": 0, "connected": 0, "disconnected": 0}
+
+    def get_detection_statistics(self) -> Dict[str, Any]:
+        """Calculate counts of registered events categorized by event type."""
+        try:
+            events = self.coordinator.event_manager.list_events()
+            stats = {}
+            for e in events:
+                stats[e.event_type.value] = stats.get(e.event_type.value, 0) + 1
+            return stats
+        except Exception as e:
+            logger.error("Failed to get detection statistics: %s", e)
+            return {}
+
+    def get_pipeline_metrics(self) -> Dict[str, Any]:
+        """Alias for listing processing latency throughput metrics."""
+        return self.get_performance_metrics()
+
+    def get_latency_statistics(self) -> Dict[str, float]:
+        """Filter latency records from performance metrics."""
+        perf = self.get_performance_metrics()
+        return {k: v for k, v in perf.items() if "latency" in k}
+
+    # ── Simulation & Configuration Hooks ──────────────────────────────────
+
+    def simulate_frame_injection(self, camera_id: str, frame_type: str) -> Tuple[bool, str]:
+        """Simulate feeding an incident frame (fire, smoke, etc.) to verify pipeline propagation."""
+        return self.trigger_incident_simulation(camera_id, frame_type.upper())
+
+    def reload_models(self) -> Tuple[bool, str]:
+        """Force the detector plugins inside the pipeline to reload their weights."""
+        try:
+            for name in self.coordinator.detection_pipeline.registry.list_detectors():
+                detector = self.coordinator.detection_pipeline.registry.get_detector(name)
+                if hasattr(detector, "load_model") and callable(detector.load_model):
+                    detector.load_model()
+            return True, "All detector models reloaded successfully."
+        except Exception as e:
+            logger.error("Failed to reload models: %s", e)
+            return False, f"Reload failed: {e}"
+
+    def reset_pipeline(self) -> Tuple[bool, str]:
+        """Stop and restart the pipeline coordinator to reset dynamic in-memory configurations."""
+        try:
+            self.coordinator.stop()
+            self.coordinator.start()
+            return True, "Pipeline integration state reset successfully."
+        except Exception as e:
+            logger.error("Failed to reset pipeline: %s", e)
+            return False, f"Reset failed: {e}"
+
+    def update_threshold(self, detector_name: str, threshold: float) -> Tuple[bool, str]:
+        """Update detection confidence threshold on a running detector plugin."""
+        try:
+            detector = self.coordinator.detection_pipeline.registry.get_detector(detector_name)
+            if hasattr(detector, "confidence_threshold"):
+                detector.confidence_threshold = threshold
+                return True, f"Confidence threshold for '{detector_name}' set to {threshold}."
+            return False, f"Detector '{detector_name}' does not support threshold configuration."
+        except Exception as e:
+            logger.error("Failed to update threshold: %s", e)
+            return False, f"Failed to update threshold: {e}"
+
+    def export_configuration(self) -> Dict[str, Any]:
+        """Export serialized pipeline dynamic configuration metadata."""
+        try:
+            configs = {}
+            for name in self.coordinator.detection_pipeline.registry.list_detectors():
+                det = self.coordinator.detection_pipeline.registry.get_detector(name)
+                configs[f"detector_{name}"] = {
+                    "model_path": getattr(det, "model_path", None),
+                    "confidence_threshold": getattr(det, "confidence_threshold", None)
+                }
+            configs["alerts"] = {
+                "default_channel": self.coordinator.alert_manager.default_channel_name,
+                "registered_channels": list(self.coordinator.alert_manager._channels.keys())
+            }
+            configs["cameras"] = [
+                {"camera_id": c.camera_id, "name": c.name, "source": str(c.source), "status": c.status.value}
+                for c in self.coordinator.camera_manager.list_cameras()
+            ]
+            return configs
+        except Exception as e:
+            logger.error("Failed to export configurations: %s", e)
+            return {"error": str(e)}
 
 
 def get_backend_gateway() -> BackendGateway:
