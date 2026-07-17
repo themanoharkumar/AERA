@@ -23,16 +23,27 @@ st.markdown(
             display: none !important;
         }
         
-        /* Disable sidebar collapse button to keep navigation permanently visible */
-        [data-testid="sidebar-collapse-button"] {
-            display: none !important;
+        /* Force native sidebar width to be 260px when expanded */
+        [data-testid="stSidebar"][aria-expanded="true"] {
+            min-width: 260px !important;
+            max-width: 260px !important;
+            width: 260px !important;
         }
         
-        /* Hide default Streamlit decoration elements */
+        [data-testid="stSidebar"][aria-expanded="true"] > div:first-child {
+            width: 260px !important;
+        }
+        
+        /* Reset sidebar width to 0px when collapsed to allow content to expand leftward */
+        [data-testid="stSidebar"][aria-expanded="false"] {
+            min-width: 0px !important;
+            max-width: 0px !important;
+            width: 0px !important;
+        }
+        
+        /* Hide default Streamlit decoration elements (do not hide header/toggle controls) */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
-        header {visibility: hidden;}
-        [data-testid="stHeader"] {display: none !important;}
         
         /* Adjust layout spacing */
         .block-container {
