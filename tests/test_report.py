@@ -266,3 +266,43 @@ def test_report_manager_concurrency() -> None:
 
     assert len(all_reports) == num_threads * num_reports_per_thread
     assert len(manager.list_reports()) == num_threads * num_reports_per_thread
+
+
+def test_report_manager_retrieval_apis():
+    """Verify that ReportManager get_operator_report, get_forensic_report, and download_forensic_report APIs work."""
+    manager = ReportManager()
+
+    decision = DecisionResult(
+        decision_id="dec_123",
+        event_id="evt_123",
+        severity=DecisionSeverity.MEDIUM,
+        action="monitor",
+        reason="reason_123",
+        confidence=0.88,
+        timestamp=time.time(),
+        metadata={},
+    )
+    evidence = Evidence(
+        evidence_id="ev_123",
+        event_id="evt_123",
+        decision_id="dec_123",
+        image_path="img.jpg",
+        video_path="",
+        timestamp=time.time(),
+        metadata={"camera_id": "cam_1"},
+    )
+    report = manager.generate_report(decision, evidence)
+
+    operator_report = manager.get_operator_report(report.report_id)
+    assert operator_report is not None
+    assert "🚨 AERA INCIDENT REPORT" in operator_report
+
+    forensic_report = manager.get_forensic_report(report.report_id)
+    assert forensic_report is not None
+    assert "--- EVENT DETAILS ---" in forensic_report
+
+    raw_bytes = manager.download_forensic_report(report.report_id)
+    assert raw_bytes is not None
+    assert len(raw_bytes) > 0
+    assert raw_bytes.decode("utf-8") == forensic_report
+

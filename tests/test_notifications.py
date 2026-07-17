@@ -293,3 +293,89 @@ def test_telegram_notifier_adapter_routing():
     assert msg.metadata["camera"] == "Cam_1"
     assert msg.metadata["severity"] == "HIGH"
 
+
+def test_notification_decision_matrix():
+    """Verify severity routing decision matrix: LOW, HIGH, and CRITICAL rules."""
+    config = NotificationConfig(
+        telegram_enabled=True,
+        telegram_bot_token="token",
+        telegram_chat_id="chat",
+        send_images=True,
+        attach_forensic_for_critical=True,
+        attach_forensic_always=False
+    )
+    manager = NotificationManager(config)
+
+    mock_notifier = MagicMock()
+    mock_notifier.name = "TelegramNotifier"
+    mock_notifier.send.return_value = NotificationResult(
+        success=True,
+        status=NotificationDeliveryStatus.SUCCESS,
+        channel="TelegramNotifier",
+        timestamp=100.0,
+        latency=0.01,
+    )
+    manager.register_notifier(mock_notifier)
+
+    # 1. Test LOW severity - should strip screenshot and report
+    att = NotificationAttachment(file_path="image.jpg", content_type="image/jpeg")
+    msg_low = NotificationMessage(
+        recipient="chat",
+        subject="Low Event",
+        body="Body",
+        urgency="LOW",
+        attachments=[att],
+        metadata={"report_path": "report.md"}
+    )
+    manager.route_notification("TelegramNotifier", msg_low)
+    sent_msg = mock_notifier.send.call_args[0][0]
+    assert len(sent_msg.attachments) == 0
+    assert sent_msg.metadata.get("report_path") is None
+
+    # 2. Test HIGH severity - should keep screenshot, but strip report
+    mock_notifier.reset_mock()
+    msg_high = NotificationMessage(
+        recipient="chat",
+        subject="High Event",
+        body="Body",
+        urgency="HIGH",
+        attachments=[att],
+        metadata={"report_path": "report.md"}
+    )
+    manager.route_notification("TelegramNotifier", msg_high)
+    sent_msg = mock_notifier.send.call_args[0][0]
+    assert len(sent_msg.attachments) == 1
+    assert sent_msg.metadata.get("report_path") is None
+
+    # 3. Test CRITICAL severity with attach enabled - should keep both
+    mock_notifier.reset_mock()
+    msg_crit = NotificationMessage(
+        recipient="chat",
+        subject="Critical Event",
+        body="Body",
+        urgency="CRITICAL",
+        attachments=[att],
+        metadata={"report_path": "report.md"}
+    )
+    manager.route_notification("TelegramNotifier", msg_crit)
+    sent_msg = mock_notifier.send.call_args[0][0]
+    assert len(sent_msg.attachments) == 1
+    assert sent_msg.metadata.get("report_path") == "report.md"
+
+    # 4. Test CRITICAL severity with attach disabled
+    config_no_crit = NotificationConfig(
+        telegram_enabled=True,
+        telegram_bot_token="token",
+        telegram_chat_id="chat",
+        send_images=True,
+        attach_forensic_for_critical=False,
+    )
+    manager_no_crit = NotificationManager(config_no_crit)
+    manager_no_crit.register_notifier(mock_notifier)
+    mock_notifier.reset_mock()
+    manager_no_crit.route_notification("TelegramNotifier", msg_crit)
+    sent_msg = mock_notifier.send.call_args[0][0]
+    assert len(sent_msg.attachments) == 1
+    assert sent_msg.metadata.get("report_path") is None
+
+

@@ -776,6 +776,19 @@ class BackendGateway:
             return {"error": str(e)}
 
 
+    def get_operator_report(self, report_id: str) -> Optional[str]:
+        """Retrieve compiled Operator Report by report ID."""
+        return self.coordinator.report_manager.get_operator_report(report_id)
+
+    def get_forensic_report(self, report_id: str) -> Optional[str]:
+        """Retrieve compiled Forensic Report by report ID."""
+        return self.coordinator.report_manager.get_forensic_report(report_id)
+
+    def download_forensic_report(self, report_id: str) -> Optional[bytes]:
+        """Download Forensic Report bytes by report ID."""
+        return self.coordinator.report_manager.download_forensic_report(report_id)
+
+
 def get_backend_gateway() -> BackendGateway:
     """Access or initialize the thread-safe gateway cached inside session state."""
     if "backend_gateway" not in st.session_state:

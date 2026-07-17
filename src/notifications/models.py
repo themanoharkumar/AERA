@@ -50,6 +50,8 @@ class NotificationConfig:
     parse_mode: str = "Markdown"
     silent_notifications: bool = False
     chat_groups: List[str] = field(default_factory=list)
+    attach_forensic_for_critical: bool = True
+    attach_forensic_always: bool = False
 
     @classmethod
     def from_env(cls) -> "NotificationConfig":
@@ -70,6 +72,8 @@ class NotificationConfig:
         send_images = parse_bool("SEND_IMAGES", True)
         send_reports = parse_bool("SEND_REPORTS", True)
         silent_notifications = parse_bool("SILENT_NOTIFICATIONS", False)
+        attach_forensic_for_critical = parse_bool("ATTACH_FORENSIC_FOR_CRITICAL", True)
+        attach_forensic_always = parse_bool("ATTACH_FORENSIC_ALWAYS", False)
 
         # 2. Extract credential strings
         telegram_bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
@@ -128,10 +132,11 @@ class NotificationConfig:
             send_reports=send_reports,
             retry_count=retry_count,
             retry_delay=retry_delay,
-            timeout=timeout,
             minimum_severity=minimum_severity,
             parse_mode=parse_mode,
             silent_notifications=silent_notifications,
+            attach_forensic_for_critical=attach_forensic_for_critical,
+            attach_forensic_always=attach_forensic_always,
         )
 
     def get_debug_summary(self) -> str:
@@ -153,7 +158,9 @@ class NotificationConfig:
             f"retry_count={self.retry_count}, "
             f"retry_delay={self.retry_delay}, "
             f"timeout={self.timeout}, "
-            f"minimum_severity='{self.minimum_severity}'"
+            f"minimum_severity='{self.minimum_severity}', "
+            f"attach_forensic_for_critical={self.attach_forensic_for_critical}, "
+            f"attach_forensic_always={self.attach_forensic_always}"
             f")"
         )
 

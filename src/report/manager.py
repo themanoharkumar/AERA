@@ -117,7 +117,19 @@ class ReportManager:
                 incident_number=incident_number,
             )
 
-            # 6. Cache report thread-safely
+            # 6. Persist Forensic report on disk for official audit records
+            import os
+            try:
+                report_dir = "storage/reports"
+                os.makedirs(report_dir, exist_ok=True)
+                persist_path = f"{report_dir}/{incident_number}.md"
+                with open(persist_path, "w", encoding="utf-8") as f:
+                    f.write(rendered_summary)
+                logger.info("Persisted forensic report to disk: %s", persist_path)
+            except Exception as persist_err:
+                logger.warning("Failed to persist forensic report to disk: %s", persist_err)
+
+            # 7. Cache report thread-safely
             with self._lock:
                 self._reports[report_id] = report
 
@@ -180,6 +192,42 @@ class ReportManager:
         with self._lock:
             self._reports.clear()
             logger.info("ReportManager cache cleared.")
+
+    def get_operator_report(self, report_id: str) -> Optional[str]:
+        """Retrieve the compiled Operator Report text by its report identifier.
+
+        Args:
+            report_id: Unique report identifier.
+
+        Returns:
+            The Operator Report string if cached, else None.
+        """
+        report = self.get_report(report_id)
+        return report.operator_summary if report else None
+
+    def get_forensic_report(self, report_id: str) -> Optional[str]:
+        """Retrieve the compiled Forensic Report text by its report identifier.
+
+        Args:
+            report_id: Unique report identifier.
+
+        Returns:
+            The Forensic Report string if cached, else None.
+        """
+        report = self.get_report(report_id)
+        return report.summary if report else None
+
+    def download_forensic_report(self, report_id: str) -> Optional[bytes]:
+        """Download the Forensic Report content as a raw UTF-8 byte stream.
+
+        Args:
+            report_id: Unique report identifier.
+
+        Returns:
+            Raw bytes of the forensic report content, or None.
+        """
+        report_text = self.get_forensic_report(report_id)
+        return report_text.encode("utf-8") if report_text else None
 
     def _generate_incident_number(self, timestamp: float) -> str:
         """Dynamically generate a sequential human-friendly incident ID.

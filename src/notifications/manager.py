@@ -95,6 +95,48 @@ class NotificationManager:
                 attempts=0,
             )
 
+        # 2. Decision Matrix filtering based on severity
+        severity = message.urgency.upper() if message.urgency else "LOW"
+        send_screenshot = self._config.send_images and severity in ("MEDIUM", "HIGH", "CRITICAL")
+        
+        attach_report = False
+        if self._config.attach_forensic_always:
+            attach_report = True
+        elif severity == "CRITICAL" and self._config.attach_forensic_for_critical:
+            attach_report = True
+
+        # Construct final list of attachments based on severity
+        modified_attachments = []
+        has_screenshot_attachment = False
+        if send_screenshot:
+            for att in message.attachments:
+                if "image" in att.content_type.lower():
+                    modified_attachments.append(att)
+                    has_screenshot_attachment = True
+
+        # Copy and clean metadata report path if not attaching
+        new_metadata = dict(message.metadata)
+        report_path = message.metadata.get("report_path")
+        if not attach_report:
+            new_metadata["report_path"] = None
+
+        from dataclasses import replace
+        final_message = replace(
+            message,
+            attachments=modified_attachments,
+            metadata=new_metadata
+        )
+
+        # Log Notification Strategy Decisions
+        screenshot_status = "Sent" if (send_screenshot and has_screenshot_attachment) else "Bypassed"
+        report_status = "Attached" if (attach_report and report_path) else "Stored Only"
+        logger.info(
+            "Notification Strategy | Severity: %s | Operator Report: Sent | Screenshot: %s | Forensic Report: %s",
+            severity,
+            screenshot_status,
+            report_status
+        )
+
         with self._lock:
             if channel_name not in self._notifiers:
                 raise NotificationValidationError(
@@ -103,4 +145,4 @@ class NotificationManager:
             notifier = self._notifiers[channel_name]
 
         # Call send without holding the manager-wide lock to prevent thread blockage
-        return notifier.send(message)
+        return notifier.send(final_message)
