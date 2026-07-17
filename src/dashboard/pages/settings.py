@@ -65,14 +65,19 @@ def render_page(gateway: BackendGateway) -> None:
     with tab_configs:
         st.markdown("### ⚙️ System Configuration Parameters")
 
+        # 1. Fetch active thresholds configuration from the gateway
+        config_data = gateway.export_configuration()
+        fire_thresh = config_data.get("detector_fire_detector", {}).get("confidence_threshold", 0.50)
+        smoke_thresh = config_data.get("detector_smoke_detector", {}).get("confidence_threshold", 0.45)
+
         # Threshold parameters inputs
         st.markdown("##### 🎯 Detection Confidence Thresholds")
         col_fire_th, col_smoke_th = st.columns(2)
         
         with col_fire_th:
-            st.slider("Fire Event Confidence limit:", min_value=0.0, max_value=1.0, value=0.50, step=0.05)
+            fire_val = st.slider("Fire Event Confidence limit:", min_value=0.0, max_value=1.0, value=fire_thresh, step=0.05)
         with col_smoke_th:
-            st.slider("Smoke Event Confidence limit:", min_value=0.0, max_value=1.0, value=0.45, step=0.05)
+            smoke_val = st.slider("Smoke Event Confidence limit:", min_value=0.0, max_value=1.0, value=smoke_thresh, step=0.05)
 
         st.divider()
 
@@ -101,7 +106,20 @@ def render_page(gateway: BackendGateway) -> None:
         col_save, col_reset = st.columns([1, 1])
         with col_save:
             if st.button("💾 Save Configs Changes", use_container_width=True, type="primary"):
-                st.success("Configurations successfully synchronized and persisted.")
+                with st.spinner("Saving configuration settings..."):
+                    success_fire, msg_fire = gateway.update_threshold("fire_detector", fire_val)
+                    success_smoke, msg_smoke = gateway.update_threshold("smoke_detector", smoke_val)
+                    gateway.reload_models()
+                    if success_fire and success_smoke:
+                        st.success("Configurations successfully synchronized and persisted.")
+                    else:
+                        st.error(f"Failed to synchronize thresholds: {msg_fire} | {msg_smoke}")
         with col_reset:
             if st.button("🔄 Restore Engine Defaults", use_container_width=True):
-                st.info("System settings returned to defaults.")
+                with st.spinner("Restoring default engine settings..."):
+                    success, msg = gateway.reset_pipeline()
+                    if success:
+                        st.success("System settings returned to defaults.")
+                        st.rerun()
+                    else:
+                        st.error(f"Failed to restore defaults: {msg}")

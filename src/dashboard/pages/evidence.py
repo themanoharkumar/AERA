@@ -34,7 +34,7 @@ def render_page(gateway: BackendGateway) -> None:
         st.session_state.selected_event_id = None
 
     if not evidence_list:
-        st.warning("📁 **No evidence packages** generated yet.")
+        st.info("ℹ️ **No evidence packages available.** No incidents have been captured yet.")
         return
 
     # 3. Create selector selectbox
@@ -66,10 +66,35 @@ def render_page(gateway: BackendGateway) -> None:
             # Display image screenshot
             img_path = selected_evidence.image_path
             
-            if img_path and os.path.exists(img_path):
+            if img_path and os.path.exists(img_path) and os.path.getsize(img_path) > 0:
                 st.image(img_path, caption="Verified Incident Frame Screenshot", use_container_width=True)
             else:
-                st.warning(f"⚠️ Screenshot file not found at: `{img_path}`")
+                # Generate a professional placeholder image using CV2 and NumPy
+                import cv2
+                import numpy as np
+                placeholder = np.zeros((300, 500, 3), dtype=np.uint8)
+                placeholder[:, :] = [245, 246, 248]  # Very light gray background (#F5F6F8)
+                
+                # Draw text in the center
+                text = "No Evidence Image Available"
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                font_scale = 0.55
+                thickness = 1
+                text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
+                text_x = (placeholder.shape[1] - text_size[0]) // 2
+                text_y = (placeholder.shape[0] + text_size[1]) // 2
+                
+                cv2.putText(
+                    placeholder,
+                    text,
+                    (text_x, text_y),
+                    font,
+                    font_scale,
+                    (107, 114, 128),  # Secondary gray text (#6B7280)
+                    thickness,
+                    cv2.LINE_AA
+                )
+                st.image(placeholder, caption="Evidence Image Not Captured", use_container_width=True)
                 
             # Render video path information block
             st.markdown("##### 📹 Associated Video Reference")

@@ -23,6 +23,10 @@ def render_page(gateway: BackendGateway) -> None:
     df_alert_stats = gateway.get_alert_statistics()
     df_health = gateway.get_camera_uptime_stats()
 
+    if df_trends.empty and df_distribution.empty and df_alert_stats.empty:
+        st.info("ℹ️ **Insufficient data for analytics.** No incidents or alerts have been captured yet.")
+        return
+
     # 3. Render Row 1: Incident Trends Line Chart & Distribution Pie Chart
     col_trends, col_dist = st.columns(2)
 

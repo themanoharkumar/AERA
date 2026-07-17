@@ -46,7 +46,7 @@ def render_page(gateway: BackendGateway) -> None:
         st.divider()
 
     if not reports:
-        st.warning("📄 **No compiled reports** found in archive.")
+        st.info("ℹ️ **No reports have been generated.**")
         return
 
     # 3. Create selector selectbox

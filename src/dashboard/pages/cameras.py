@@ -46,17 +46,25 @@ def render_page(gateway: BackendGateway) -> None:
     st.divider()
 
     # 3. Render Camera Grid
+    active_placeholders = []
     if filtered_cams:
         # 2-column responsive grid
         grid_cols = st.columns(2)
         for idx, cam in enumerate(filtered_cams):
             with grid_cols[idx % 2]:
-                render_camera_card(gateway, cam)
+                placeholder = render_camera_card(gateway, cam)
+                if placeholder is not None:
+                    active_placeholders.append((cam.camera_id, placeholder))
     else:
         st.warning(f"📷 **No cameras found** matching status filter: *{selected_status}*.")
 
-    # 4. Handle auto-refresh pacing loop
-    if auto_refresh:
-        # Wait 300 milliseconds before triggering layout rerun to simulate ~3 FPS updates
-        time.sleep(0.3)
-        st.rerun()
+    # 4. Handle auto-refresh in-place updates loop
+    if auto_refresh and active_placeholders:
+        # Run smooth, in-place frame buffer updates without page-level reload
+        while True:
+            for camera_id, placeholder in active_placeholders:
+                frame, is_active = gateway.get_latest_frame(camera_id)
+                if frame is not None:
+                    placeholder.image(frame, channels="BGR", use_container_width=True)
+            # Sleep 100ms for a smooth 10 FPS experience
+            time.sleep(0.1)

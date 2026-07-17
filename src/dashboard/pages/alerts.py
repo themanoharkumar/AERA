@@ -17,6 +17,10 @@ def render_page(gateway: BackendGateway) -> None:
     # 1. Fetch alerts
     alerts = gateway.get_alerts()
 
+    if not alerts:
+        st.info("ℹ️ **No alerts have been dispatched.**")
+        return
+
     # 2. Render filter panel controls
     st.markdown("### 🔍 Filter Alerts")
     col_sev, col_status = st.columns([1, 1])

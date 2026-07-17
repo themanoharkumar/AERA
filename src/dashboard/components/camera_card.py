@@ -5,10 +5,11 @@ and a visual stream display using native Streamlit widgets.
 """
 
 import streamlit as st
+from typing import Any
 from src.dashboard.services.backend import BackendGateway
 from src.camera.camera import CameraStatus, Camera
 
-def render_camera_card(gateway: BackendGateway, camera: Camera) -> None:
+def render_camera_card(gateway: BackendGateway, camera: Camera) -> Any:
     """Render a card displaying camera status, connection, and stream frames.
 
     Args:
@@ -17,14 +18,24 @@ def render_camera_card(gateway: BackendGateway, camera: Camera) -> None:
     """
     camera_id = camera.camera_id
     status = camera.status
+
+    # Initialize error tracking set in session state if missing
+    if "camera_errors" not in st.session_state:
+        st.session_state.camera_errors = set()
     
-    # 1. Determine status badge text using standard Markdown color tokens
-    if status == CameraStatus.STREAMING:
-        status_badge = "**:green[● STREAMING]**"
-    elif status in (CameraStatus.CONNECTED, CameraStatus.CONNECTING):
-        status_badge = "**:blue[● CONNECTED]**"
+    # 1. Determine status badge text using standard Markdown color tokens and enhanced mappings
+    if camera_id in st.session_state.camera_errors and status != CameraStatus.STREAMING:
+        status_badge = "**:red[● Error]**"
+    elif status == CameraStatus.STREAMING:
+        status_badge = "**:green[● Streaming]**"
+    elif status == CameraStatus.CONNECTING:
+        status_badge = "**:orange[● Connecting]**"
+    elif status == CameraStatus.CONNECTED:
+        status_badge = "**:blue[● Initializing]**"
+    elif status == CameraStatus.RECONNECTING:
+        status_badge = "**:orange[● Reconnecting]**"
     else:
-        status_badge = "**:grey[● OFFLINE]**"
+        status_badge = "**:grey[● Stopped]**"
 
     # Everything belongs inside one clean card (container with border)
     with st.container(border=True):
@@ -59,17 +70,31 @@ def render_camera_card(gateway: BackendGateway, camera: Camera) -> None:
         with col_btn:
             if status == CameraStatus.STREAMING:
                 if st.button("Stop", key=f"cam_ctrl_stop_{camera_id}", use_container_width=True):
-                    success, msg = gateway.stop_camera(camera_id)
-                    if success:
-                        st.success(msg)
-                        st.rerun()
-                    else:
-                        st.error(msg)
+                    with st.status("Stopping stream...", expanded=True) as status_box:
+                        st.write("Releasing resources...")
+                        success, msg = gateway.stop_camera(camera_id)
+                        if success:
+                            status_box.update(label="Stopped", state="complete")
+                            st.success(msg)
+                            st.rerun()
+                        else:
+                            status_box.update(label="Error releasing stream resources", state="error")
+                            st.error(msg)
             else:
                 if st.button("Start", key=f"cam_ctrl_start_{camera_id}", use_container_width=True, type="primary"):
-                    success, msg = gateway.start_camera(camera_id)
-                    if success:
-                        st.success(msg)
-                        st.rerun()
-                    else:
-                        st.error(msg)
+                    with st.status("Connecting camera...", expanded=True) as status_box:
+                        st.write("Initializing stream...")
+                        st.write("Loading detector...")
+                        success, msg = gateway.start_camera(camera_id)
+                        if success:
+                            # Clear error tracking on success
+                            st.session_state.camera_errors.discard(camera_id)
+                            status_box.update(label="Ready", state="complete")
+                            st.success(msg)
+                            st.rerun()
+                        else:
+                            # Track error status
+                            st.session_state.camera_errors.add(camera_id)
+                            status_box.update(label="Error initiating camera connection", state="error")
+                            st.error(msg)
+    return feed_placeholder if status == CameraStatus.STREAMING else None

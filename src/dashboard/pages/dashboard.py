@@ -86,7 +86,7 @@ def render_page(gateway: BackendGateway) -> None:
             for event in unresolved_incidents[:3]:
                 render_incident_card(event)
         else:
-            st.success("✅ **All clear.** No active incident alerts detected.")
+            st.info("ℹ️ **No incidents detected.** System operating normally.")
 
     with col_cameras:
         st.markdown("### 📹 Connected Feeds")
@@ -126,28 +126,32 @@ def render_page(gateway: BackendGateway) -> None:
         )
 
     with col_fps:
+        threads = int(perf.get('thread_count', 0))
         render_metric_card(
             label="Processing Throughput",
-            value=f"{perf.get('fps', 30.0):.1f}",
+            value=f"{perf.get('fps', 0.0):.1f}",
             unit="FPS",
-            sublabel="Real-time capture paced",
+            sublabel=f"Active Threads: {threads}",
             color_accent="#3B82F6"
         )
 
     with col_cpu:
+        uptime_secs = int(perf.get('uptime', 0))
+        uptime_str = f"{uptime_secs // 60}m {uptime_secs % 60}s" if uptime_secs >= 60 else f"{uptime_secs}s"
         render_metric_card(
             label="System CPU Load",
-            value=f"{perf.get('cpu_usage', 0.5):.1f}",
+            value=f"{perf.get('cpu_usage', 0.0):.1f}",
             unit="%",
-            sublabel="Multi-threaded processing",
+            sublabel=f"Process Uptime: {uptime_str}",
             color_accent="#F59E0B"
         )
 
     with col_mem:
+        mem_pct = perf.get('memory_percent', 0.0)
         render_metric_card(
             label="Process Memory RSS",
-            value=f"{perf.get('memory_usage', 52.0):.1f}",
+            value=f"{perf.get('memory_usage', 0.0):.1f}",
             unit="MB",
-            sublabel="Peak heap stabilized",
+            sublabel=f"Memory Percent: {mem_pct:.2f}%",
             color_accent="#E5E7EB"
         )
