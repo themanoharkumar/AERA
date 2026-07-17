@@ -240,6 +240,18 @@ class CameraManager:
 
         return stream.read_frame()
 
+    def get_camera(self, camera_id: str) -> Optional[Camera]:
+        """Retrieve a registered camera instance by its identifier.
+
+        Args:
+            camera_id: Unique identifier for the camera.
+
+        Returns:
+            The Camera instance if registered, otherwise None.
+        """
+        with self._lock:
+            return self._cameras.get(camera_id)
+
     def list_cameras(self) -> List[Camera]:
         """List all registered cameras.
 

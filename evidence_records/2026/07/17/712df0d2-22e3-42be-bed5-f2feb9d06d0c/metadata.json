@@ -1,0 +1,16 @@
+{
+    "camera_id": "webcam_0",
+    "event_id": "712df0d2-22e3-42be-bed5-f2feb9d06d0c",
+    "decision_id": "b3153dcc-90d9-47bf-bca2-a5fad0decc67",
+    "timestamp": 1784296069.8940027,
+    "detector_name": "smoke_detector",
+    "file_size": 90924,
+    "resolution": [
+        1280,
+        720
+    ],
+    "custom_metadata": {
+        "detector_confidence": 0.99,
+        "label": "smoke"
+    }
+}

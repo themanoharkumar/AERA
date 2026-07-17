@@ -108,6 +108,9 @@ class EmergencyPipeline:
                     success, encoded_img = cv2.imencode(".jpg", frame)
                     image_bytes = encoded_img.tobytes() if success else b""
 
+                    camera_obj = self.coordinator.camera_manager.get_camera(camera_id)
+                    camera_name = camera_obj.name if camera_obj else camera_id
+                    
                     evidence_metadata = EvidenceMetadata(
                         camera_id=camera_id,
                         event_id=event.event_id,
@@ -121,6 +124,7 @@ class EmergencyPipeline:
                         custom_metadata={
                             "detector_confidence": result.confidence,
                             "label": result.label,
+                            "camera_name": camera_name,
                         },
                     )
 

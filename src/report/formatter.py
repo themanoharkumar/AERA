@@ -131,3 +131,137 @@ class ReportFormatter:
             "evidence_information": evidence_information,
             "footer": footer,
         }
+
+    def generate_operator_report(self, decision: DecisionResult, evidence: Evidence, incident_number: str) -> str:
+        """Generate a concise, professional, and actionable report format for operators and Telegram.
+
+        Args:
+            decision: The validated DecisionResult.
+            evidence: The corresponding Evidence package.
+            incident_number: Unique sequential human-friendly incident number.
+
+        Returns:
+            Concise, emoji-enriched formatted Operator report.
+        """
+        # 1. Date and Time
+        dt = datetime.fromtimestamp(decision.timestamp)
+        date_str = dt.strftime("%d %B %Y")
+        time_str = dt.strftime("%H:%M:%S UTC")
+
+        # 2. Incident label
+        custom_meta = evidence.metadata.get("custom_metadata", {}) if isinstance(evidence.metadata, dict) else getattr(evidence.metadata, "custom_metadata", {})
+        label = custom_meta.get("label", "suspicious activity")
+        incident_type = f"{label.capitalize()} Detected" if "detected" not in label.lower() else label.capitalize()
+
+        # 3. Severity formatting
+        raw_severity = self.format_severity(decision.severity)
+        severity_map = {
+            "LOW": "🟢 LOW",
+            "MEDIUM": "🟡 MEDIUM",
+            "HIGH": "🔴 HIGH",
+            "CRITICAL": "🚨 CRITICAL"
+        }
+        severity_str = severity_map.get(raw_severity, raw_severity)
+
+        # 4. Camera source lookup
+        camera_name = custom_meta.get("camera_name")
+        if not camera_name:
+            camera_name = evidence.metadata.get("camera_id") if isinstance(evidence.metadata, dict) else getattr(evidence.metadata, "camera_id", None)
+        if not camera_name:
+            camera_name = "webcam_0"
+
+        # 5. Detection Confidence
+        confidence_pct = f"{decision.confidence:.0%}"
+
+        # 6. Natural Language Summary and Action mapping
+        action_raw = decision.action.upper()
+        action_map = {
+            "ESCALATE": "ESCALATED",
+            "LOG": "LOGGED",
+            "RESOLVE": "RESOLVED",
+            "IGNORE": "IGNORED",
+            "NOTIFY": "NOTIFIED"
+        }
+        action_str = action_map.get(action_raw, action_raw)
+        
+        summary_text = (
+            f"AERA detected {label.lower()} with a confidence level of {confidence_pct}. "
+            f"Because the event exceeded the {raw_severity} severity threshold, "
+            f"AERA automatically {action_str.lower()} the incident for immediate attention."
+        )
+
+        # 7. Recommended Actions
+        actions = []
+        if "fire" in label.lower() or "smoke" in label.lower():
+            actions = [
+                "• Inspect affected location immediately",
+                "• Notify emergency personnel",
+                "• Prepare evacuation if hazard increases"
+            ]
+        elif "fall" in label.lower():
+            actions = [
+                "• Verify person consciousness and breathing",
+                "• Administer first aid if trained",
+                "• Call medical emergency dispatch if needed"
+            ]
+        elif "intrusion" in label.lower():
+            actions = [
+                "• Check secure area locks and door sensors",
+                "• Review live camera streams",
+                "• Alert security guard/police responders"
+            ]
+        else:
+            actions = [
+                "• Monitor camera source live stream",
+                "• Dispatch an inspector to check the location",
+                "• Verify event details in backend archives"
+            ]
+        actions_str = "\n".join(actions)
+
+        # 8. Evidence status checks (no Windows paths!)
+        has_screenshot = bool(evidence.image_path)
+        has_video = bool(evidence.video_path)
+        screenshot_status = "✅ Screenshot Attached" if has_screenshot else "❌ Screenshot Not Available"
+        video_status = "✅ Video Clip Attached" if has_video else "❌ Video Clip Not Available"
+
+        # 9. Format Operator Report
+        op_report = (
+            f"══════════════════════════════════════\n"
+            f"🚨 AERA INCIDENT REPORT\n"
+            f"══════════════════════════════════════\n"
+            f"Incident ID\n"
+            f"{incident_number}\n\n"
+            f"Date\n"
+            f"{date_str}\n\n"
+            f"Time\n"
+            f"{time_str}\n\n"
+            f"Incident\n"
+            f"{incident_type}\n\n"
+            f"Severity\n"
+            f"{severity_str}\n\n"
+            f"Camera\n"
+            f"{camera_name}\n\n"
+            f"Detection Confidence\n"
+            f"{confidence_pct}\n"
+            f"────────────────────────────\n"
+            f"Summary\n"
+            f"{summary_text}\n"
+            f"────────────────────────────\n"
+            f"Recommended Actions\n"
+            f"{actions_str}\n"
+            f"────────────────────────────\n"
+            f"Evidence\n"
+            f"{screenshot_status}\n"
+            f"✅ Incident Report Attached\n"
+            f"{video_status}\n"
+            f"────────────────────────────\n"
+            f"System Action\n"
+            f"{action_str}\n"
+            f"────────────────────────────\n"
+            f"Generated by\n"
+            f"AERA AI Emergency Response Assistant\n"
+            f"Report Version 1.0\n"
+            f"══════════════════════════════════════"
+        )
+        return op_report
+

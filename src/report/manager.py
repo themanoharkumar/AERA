@@ -75,12 +75,20 @@ class ReportManager:
 
         try:
             report_id = str(uuid.uuid4())
+            now_time = time.time()
+
+            # Generate sequential incident number thread-safely
+            with self._lock:
+                incident_number = self._generate_incident_number(now_time)
 
             # 1. Compile formatted text sections
             sections = self.formatter.compile_sections(report_id, decision, evidence)
 
-            # 2. Render summary plain text using template
+            # 2. Render summary plain text using template (Forensic Report)
             rendered_summary = self.template.render(sections)
+
+            # Generate Operator Report
+            operator_summary = self.formatter.generate_operator_report(decision, evidence, incident_number)
 
             # 3. Determine severity title
             severity_str = self.formatter.format_severity(decision.severity)
@@ -88,10 +96,11 @@ class ReportManager:
 
             # 4. Define metadata
             metadata = {
-                "camera_id": evidence.metadata.get("camera_id", "UNKNOWN_CAMERA"),
-                "detector_name": evidence.metadata.get("detector_name", "UNKNOWN_DETECTOR"),
+                "camera_id": evidence.metadata.get("camera_id", "UNKNOWN_CAMERA") if isinstance(evidence.metadata, dict) else getattr(evidence.metadata, "camera_id", "UNKNOWN_CAMERA"),
+                "detector_name": evidence.metadata.get("detector_name", "UNKNOWN_DETECTOR") if isinstance(evidence.metadata, dict) else getattr(evidence.metadata, "detector_name", "UNKNOWN_DETECTOR"),
                 "template_name": self.template.name,
-                "generated_at": time.time(),
+                "generated_at": now_time,
+                "incident_number": incident_number,
             }
 
             # 5. Construct final Report entity
@@ -102,8 +111,10 @@ class ReportManager:
                 evidence_id=evidence.evidence_id,
                 title=title,
                 summary=rendered_summary,
-                timestamp=time.time(),
+                timestamp=now_time,
                 metadata=metadata,
+                operator_summary=operator_summary,
+                incident_number=incident_number,
             )
 
             # 6. Cache report thread-safely
@@ -169,3 +180,24 @@ class ReportManager:
         with self._lock:
             self._reports.clear()
             logger.info("ReportManager cache cleared.")
+
+    def _generate_incident_number(self, timestamp: float) -> str:
+        """Dynamically generate a sequential human-friendly incident ID.
+
+        Must be called under self._lock context.
+        """
+        from datetime import datetime
+        # Date in format YYYYMMDD
+        date_str = datetime.fromtimestamp(timestamp).strftime("%Y%m%d")
+        today_prefix = f"INC-{date_str}-"
+        
+        count = 1
+        for r in self._reports.values():
+            if r.incident_number and r.incident_number.startswith(today_prefix):
+                try:
+                    num = int(r.incident_number.split("-")[-1])
+                    if num >= count:
+                        count = num + 1
+                except ValueError:
+                    pass
+        return f"{today_prefix}{count:05d}"

@@ -59,6 +59,61 @@ class BackendGateway:
         self._processed_timestamps = []
         self._fps_lock = threading.Lock()
 
+        # Initialize and register notification subsystem components
+        from src.notifications import NotificationConfig, NotificationManager, TelegramNotifier, TelegramNotifierAdapter
+        telegram_active = False
+        try:
+            self.notification_config = NotificationConfig.from_env()
+            if self.notification_config.telegram_enabled:
+                telegram_active = True
+                logger.info("Loaded notification config successfully: %s", self.notification_config.get_debug_summary())
+        except Exception as e:
+            logger.warning(
+                "Telegram notifier initialization failed. Switching to ConsoleNotifier fallback. Reason: %s",
+                e
+            )
+            self.notification_config = NotificationConfig(telegram_enabled=False)
+
+        # Print formatted startup log summary (masking secrets)
+        if telegram_active:
+            summary = (
+                "\n==================================================\n"
+                "AERA Notification System Status\n"
+                "Provider : Telegram\n"
+                "Enabled  : True\n"
+                f"Images   : {'Enabled' if self.notification_config.send_images else 'Disabled'}\n"
+                f"Reports  : {'Enabled' if self.notification_config.send_reports else 'Disabled'}\n"
+                f"Min Severity: {self.notification_config.minimum_severity}\n"
+                "=================================================="
+            )
+            logger.info(summary)
+
+            self.notification_manager = NotificationManager(self.notification_config)
+            self.telegram_notifier = TelegramNotifier(self.notification_config)
+            self.notification_manager.register_notifier(self.telegram_notifier)
+
+            recipient = self.notification_config.telegram_chat_id or "default_chat"
+            self.telegram_adapter = TelegramNotifierAdapter(
+                notification_manager=self.notification_manager,
+                recipient=recipient,
+                coordinator_evidence_manager=self.coordinator.evidence_manager
+            )
+            self.coordinator.alert_manager.register_channel(self.telegram_adapter)
+            # Set TelegramNotifier as the primary default alert channel
+            self.coordinator.alert_manager.default_channel_name = "TelegramNotifier"
+            logger.info("Registered TelegramNotifier as the primary runtime notification channel.")
+        else:
+            summary_fallback = (
+                "\n==================================================\n"
+                "AERA Notification System Status\n"
+                "Provider : Console (Fallback)\n"
+                "Enabled  : True\n"
+                "=================================================="
+            )
+            logger.info(summary_fallback)
+            self.coordinator.alert_manager.default_channel_name = "ConsoleNotifier"
+            logger.info("Telegram notifier disabled or failed; falling back to ConsoleNotifier.")
+
         # 3. Start background frame processing loop to run the pipeline automatically
         self._running = True
         self._worker_thread = threading.Thread(
@@ -119,6 +174,10 @@ class BackendGateway:
         self._running = False
         if self._worker_thread.is_alive():
             self._worker_thread.join(timeout=1.0)
+        try:
+            self.telegram_notifier.close()
+        except Exception as e:
+            logger.warning("Failed to close Telegram notifier session: %s", e)
         try:
             self.coordinator.stop()
         except Exception as e:
@@ -498,6 +557,8 @@ class BackendGateway:
             if evidence is None:
                 # Create default Evidence package
                 from src.evidence.metadata import EvidenceMetadata
+                camera_obj = self.coordinator.camera_manager.get_camera(event.camera_id)
+                camera_name = camera_obj.name if camera_obj else event.camera_id
                 metadata = EvidenceMetadata(
                     camera_id=event.camera_id,
                     event_id=event_id,
@@ -506,7 +567,7 @@ class BackendGateway:
                     detector_name="AI_Manual_Compile",
                     file_size=0,
                     resolution=(0, 0),
-                    custom_metadata={}
+                    custom_metadata={"camera_name": camera_name}
                 )
                 evidence = self.coordinator.evidence_manager.create_evidence(
                     event_id=event_id,

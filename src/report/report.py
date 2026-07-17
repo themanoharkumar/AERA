@@ -22,3 +22,5 @@ class Report:
     summary: str
     timestamp: float
     metadata: Dict[str, Any]
+    operator_summary: str = ""
+    incident_number: str = ""

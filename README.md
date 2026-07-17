@@ -30,3 +30,17 @@ AERA is an AI-powered emergency monitoring platform that analyzes CCTV and webca
 
 Status:
 🚧 Under Development
+
+## Notifications Configuration
+
+The notification subsystem (`src/notifications`) is governed by `NotificationConfig` parameters. Ensure the following configurations are set in environment variables or within the configuration manager:
+
+- `TELEGRAM_ENABLED` (bool): Toggle dispatching alerts to Telegram channels.
+- `TELEGRAM_BOT_TOKEN` (str): Authorized Bot Token credential (e.g. `123456:ABC...`).
+- `TELEGRAM_CHAT_ID` (str): Target Chat/Group channel identifier.
+- `MARKDOWN_ENABLED` (bool): Format emergency alerts in Markdown.
+- `SEND_IMAGES` (bool): Attach evidence screenshots if captured.
+- `SEND_REPORTS` (bool): Forward markdown reports as files.
+- `RETRY_COUNT` (int): Connection/API request failure retries.
+- `RETRY_DELAY` (float): Exponential backoff baseline seconds.
+- `TIMEOUT` (float): HTTP request read/connection timeouts.

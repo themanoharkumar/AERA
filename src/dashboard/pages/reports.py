@@ -112,5 +112,9 @@ def render_page(gateway: BackendGateway) -> None:
         with col_preview:
             st.markdown("### 🔍 Document Preview")
             with st.container(border=True):
-                # Corrected to use active_report.summary (matches backend model)
-                st.markdown(active_report.summary)
+                # Toggle view between Operator Report and Technical Forensic Report
+                view_tech = st.toggle("View Technical Report", value=False, key=f"toggle_tech_{active_report.report_id}")
+                if view_tech:
+                    st.markdown(active_report.summary)
+                else:
+                    st.code(active_report.operator_summary or active_report.summary, language="text")

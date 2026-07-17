@@ -1,0 +1,17 @@
+{
+    "camera_id": "cam_c1",
+    "event_id": "54a5a951-5bf2-4dd4-b7ac-679aa688082f",
+    "decision_id": "f8fa9151-1c1e-40c5-bdef-38b42178f56a",
+    "timestamp": 1784296686.097766,
+    "detector_name": "fire_detector",
+    "file_size": 2350,
+    "resolution": [
+        100,
+        100
+    ],
+    "custom_metadata": {
+        "detector_confidence": 0.99,
+        "label": "fire",
+        "camera_name": "Cam 1"
+    }
+}
