@@ -47,9 +47,30 @@ class SystemCoordinator:
         if detection_pipeline is not None:
             self.detection_pipeline = detection_pipeline
         else:
+            import os
+            from src.detection.detectors.yolo_fire_smoke_detector import YOLOFireSmokeDetector
+            
+            yolo_model_path = os.environ.get("YOLO_MODEL_PATH", "ai/models/fire_smoke_v1.pt")
+            fire_threshold = float(os.environ.get("YOLO_FIRE_THRESHOLD", "0.35"))
+            smoke_threshold = float(os.environ.get("YOLO_SMOKE_THRESHOLD", "0.30"))
+            
             registry = DetectorRegistry()
-            registry.register_detector("fire_detector", FireDetector())
-            registry.register_detector("smoke_detector", SmokeDetector())
+            registry.register_detector(
+                "fire_detector",
+                YOLOFireSmokeDetector(
+                    model_path=yolo_model_path,
+                    class_label="fire",
+                    confidence_threshold=fire_threshold,
+                )
+            )
+            registry.register_detector(
+                "smoke_detector",
+                YOLOFireSmokeDetector(
+                    model_path=yolo_model_path,
+                    class_label="smoke",
+                    confidence_threshold=smoke_threshold,
+                )
+            )
             self.detection_pipeline = DetectionPipeline(registry)
 
         self.event_manager = event_manager if event_manager is not None else EventManager()

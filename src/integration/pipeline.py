@@ -104,12 +104,37 @@ class EmergencyPipeline:
 
                 # 4. Trigger escalated alert procedures if policy requires action
                 if decision_result.action == "escalate":
-                    # Encode numpy array into Jpeg bytes for storage
-                    success, encoded_img = cv2.imencode(".jpg", frame)
-                    image_bytes = encoded_img.tobytes() if success else b""
+                    # Generate annotated frame by drawing bounding boxes
+                    annotated_frame = frame.copy()
+                    for r in detection_results:
+                        if hasattr(r, "bounding_boxes") and r.bounding_boxes:
+                            for box in r.bounding_boxes:
+                                xmin, ymin, xmax, ymax = box
+                                # Draw box: red for fire, orange for smoke
+                                color = (0, 0, 255) if r.label.lower() == "fire" else (0, 165, 255)
+                                cv2.rectangle(annotated_frame, (xmin, ymin), (xmax, ymax), color, 2)
+                                label_text = f"{r.label.upper()} {r.confidence:.0%}"
+                                cv2.putText(annotated_frame, label_text, (xmin, max(15, ymin - 5)),
+                                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1, cv2.LINE_AA)
+
+                    # Encode annotated image
+                    success_ann, encoded_ann = cv2.imencode(".jpg", annotated_frame)
+                    image_bytes = encoded_ann.tobytes() if success_ann else b""
+                    
+                    # Encode original image
+                    success_orig, encoded_orig = cv2.imencode(".jpg", frame)
+                    original_bytes = encoded_orig.tobytes() if success_orig else b""
 
                     camera_obj = self.coordinator.camera_manager.get_camera(camera_id)
                     camera_name = camera_obj.name if camera_obj else camera_id
+                    
+                    custom_meta = {
+                        "detector_confidence": result.confidence,
+                        "label": result.label,
+                        "camera_name": camera_name,
+                        "bounding_boxes": getattr(result, "bounding_boxes", []),
+                        "model_metadata": getattr(result, "metadata", {}),
+                    }
                     
                     evidence_metadata = EvidenceMetadata(
                         camera_id=camera_id,
@@ -121,11 +146,7 @@ class EmergencyPipeline:
                         resolution=(frame.shape[1], frame.shape[0])
                         if len(frame.shape) >= 2
                         else (0, 0),
-                        custom_metadata={
-                            "detector_confidence": result.confidence,
-                            "label": result.label,
-                            "camera_name": camera_name,
-                        },
+                        custom_metadata=custom_meta,
                     )
 
                     # 5. Persist physical files with EvidenceManager
@@ -135,6 +156,32 @@ class EmergencyPipeline:
                         metadata=evidence_metadata,
                         image_data=image_bytes,
                     )
+
+                    # Save original image as original.jpg in the same directory
+                    if original_bytes and evidence_package.image_path:
+                        import os
+                        try:
+                            ev_dir = os.path.dirname(evidence_package.image_path)
+                            orig_path = os.path.join(ev_dir, "original.jpg")
+                            with open(orig_path, "wb") as f_orig:
+                                f_orig.write(original_bytes)
+                            
+                            # Link saved original frame to the metadata
+                            orig_url_path = orig_path.replace("\\", "/")
+                            evidence_package.metadata.setdefault("custom_metadata", {})["original_image_path"] = orig_url_path
+                            
+                            # Update metadata.json with the new path
+                            metadata_file = os.path.join(ev_dir, "metadata.json")
+                            if os.path.exists(metadata_file):
+                                import json
+                                with open(metadata_file, "r", encoding="utf-8") as f_r:
+                                    meta_data_dict = json.load(f_r)
+                                meta_data_dict.setdefault("custom_metadata", {})["original_image_path"] = orig_url_path
+                                with open(metadata_file, "w", encoding="utf-8") as f_w:
+                                    json.dump(meta_data_dict, f_w, indent=4)
+                            logger.info("Saved original frame evidence and updated metadata at: %s", orig_path)
+                        except Exception as e_orig:
+                            logger.error("Failed to save original frame to disk: %s", e_orig)
 
                     # 6. Render report layout with ReportEngine
                     report = self.coordinator.report_manager.generate_report(
