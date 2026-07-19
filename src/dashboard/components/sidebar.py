@@ -5,6 +5,10 @@ Handles page switching and displays global branding in the sidebar using native 
 
 import streamlit as st
 
+def handle_sidebar_nav(page_name: str) -> None:
+    st.session_state.current_page = page_name
+
+
 def render_sidebar() -> None:
     """Render the navigation panel inside the Streamlit sidebar."""
     with st.sidebar:
@@ -32,15 +36,14 @@ def render_sidebar() -> None:
             
             # Using Streamlit native buttons to trigger reruns on state change
             # Active button uses 'primary' styling (accent color), inactive uses 'secondary'
-            if st.button(
+            st.button(
                 f"{icon}  {page_name}",
                 key=f"nav_btn_{page_name.lower().replace(' ', '_')}",
                 use_container_width=True,
-                type="primary" if is_active else "secondary"
-            ):
-                if st.session_state.current_page != page_name:
-                    st.session_state.current_page = page_name
-                    st.rerun()
+                type="primary" if is_active else "secondary",
+                on_click=handle_sidebar_nav,
+                args=(page_name,)
+            )
 
         # 3. Footer branding info
         st.divider()

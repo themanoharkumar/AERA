@@ -10,6 +10,11 @@ import json
 from dataclasses import asdict
 from src.report.report import Report
 
+def handle_view_report_details(report_id: str) -> None:
+    st.session_state.current_page = "Reports"
+    st.session_state.selected_report_id = report_id
+
+
 def render_report_card(report: Report) -> None:
     """Render a reusable report card.
 
@@ -46,10 +51,13 @@ def render_report_card(report: Report) -> None:
         col_view, col_download = st.columns([1, 1])
         
         with col_view:
-            if st.button("View Details", key=f"rep_btn_view_{report.report_id}", use_container_width=True):
-                st.session_state.current_page = "Reports"
-                st.session_state.selected_report_id = report.report_id
-                st.rerun()
+            st.button(
+                "View Details",
+                key=f"rep_btn_view_{report.report_id}",
+                on_click=handle_view_report_details,
+                args=(report.report_id,),
+                use_container_width=True
+            )
 
         with col_download:
             # Convert Report dataclass to formatted JSON string

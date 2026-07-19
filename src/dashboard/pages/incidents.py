@@ -12,6 +12,21 @@ from src.event.priority import EventPriority
 from src.event.status import EventStatus
 from src.event.types import EventType
 
+def handle_incident_evidence(event_id: str) -> None:
+    st.session_state.current_page = "Evidence"
+    st.session_state.selected_event_id = event_id
+
+
+def handle_incident_report(event_id: str, report_id: str, is_new: bool) -> None:
+    st.session_state.current_page = "Reports"
+    if is_new:
+        st.session_state.selected_event_id = event_id
+        st.session_state.selected_report_id = None
+    else:
+        st.session_state.selected_report_id = report_id
+        st.session_state.selected_event_id = None
+
+
 def render_page(gateway: BackendGateway) -> None:
     """Render the Incidents History log page.
 
@@ -143,22 +158,32 @@ def render_page(gateway: BackendGateway) -> None:
                             st.error(msg)
                             
                 with col_act_ev:
-                    if st.button("📁 Evidence", key=f"btn_ev_{event.event_id}", use_container_width=True):
-                        st.session_state.current_page = "Evidence"
-                        st.session_state.selected_event_id = event.event_id
-                        st.rerun()
+                    st.button(
+                        "📁 Evidence",
+                        key=f"btn_ev_{event.event_id}",
+                        on_click=handle_incident_evidence,
+                        args=(event.event_id,),
+                        use_container_width=True
+                    )
                         
                 with col_act_rep:
-                    if st.button("📄 Report", key=f"btn_rep_{event.event_id}", use_container_width=True):
-                        # Attempt to find if report already exists for this event
-                        reports = gateway.get_reports()
-                        matching_report = next((r for r in reports if r.event_id == event.event_id), None)
-                        
-                        st.session_state.current_page = "Reports"
-                        if matching_report:
-                            st.session_state.selected_report_id = matching_report.report_id
-                        else:
-                            st.session_state.selected_event_id = event.event_id
-                        st.rerun()
+                    reports = gateway.get_reports()
+                    matching_report = next((r for r in reports if r.event_id == event.event_id), None)
+                    if matching_report:
+                        st.button(
+                            "📄 Report",
+                            key=f"btn_rep_{event.event_id}",
+                            on_click=handle_incident_report,
+                            args=(event.event_id, matching_report.report_id, False),
+                            use_container_width=True
+                        )
+                    else:
+                        st.button(
+                            "📄 Report",
+                            key=f"btn_rep_{event.event_id}",
+                            on_click=handle_incident_report,
+                            args=(event.event_id, "", True),
+                            use_container_width=True
+                        )
     else:
         st.info("No incident records matched current filters.")

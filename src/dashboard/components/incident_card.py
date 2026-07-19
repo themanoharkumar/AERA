@@ -10,6 +10,11 @@ from src.event.event import Event
 from src.event.priority import EventPriority
 from src.event.types import EventType
 
+def handle_view_evidence(event_id: str) -> None:
+    st.session_state.current_page = "Evidence"
+    st.session_state.selected_event_id = event_id
+
+
 def render_incident_card(event: Event) -> None:
     """Render a reusable incident event card.
 
@@ -64,7 +69,10 @@ def render_incident_card(event: Event) -> None:
             st.caption(f"ID: `{event.event_id[:8]}`")
             st.caption(f"Status: **{event.status.value.upper()}**")
         with col_btn:
-            if st.button("View Evidence", key=f"inc_action_view_{event.event_id}", use_container_width=True):
-                st.session_state.current_page = "Evidence"
-                st.session_state.selected_event_id = event.event_id
-                st.rerun()
+            st.button(
+                "View Evidence",
+                key=f"inc_action_view_{event.event_id}",
+                on_click=handle_view_evidence,
+                args=(event.event_id,),
+                use_container_width=True
+            )
