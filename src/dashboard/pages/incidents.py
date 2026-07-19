@@ -7,9 +7,8 @@ Provides inline status updates and redirect actions using native Streamlit widge
 import streamlit as st
 import datetime
 from src.dashboard.services.backend import BackendGateway
-from src.event.event import Event
+from src.incident.incident import IncidentState
 from src.event.priority import EventPriority
-from src.event.status import EventStatus
 from src.event.types import EventType
 
 def handle_incident_evidence(event_id: str) -> None:
@@ -52,7 +51,7 @@ def render_page(gateway: BackendGateway) -> None:
         selected_priority = st.selectbox("Urgency:", priority_options)
 
     with col_status:
-        status_options = ["ALL"] + [s.value.upper() for s in EventStatus]
+        status_options = ["ALL"] + [s.value.upper() for s in IncidentState]
         selected_status = st.selectbox("Lifecycle State:", status_options)
 
     # 3. Apply active filters
@@ -68,7 +67,7 @@ def render_page(gateway: BackendGateway) -> None:
     if selected_type != "ALL":
         filtered_events = [
             e for e in filtered_events
-            if e.event_type.value.upper() == selected_type
+            if e.incident_type.value.upper() == selected_type
         ]
         
     if selected_priority != "ALL":
@@ -91,7 +90,8 @@ def render_page(gateway: BackendGateway) -> None:
     if filtered_events:
         # Loop through matched incidents and display each inside a bordered container card
         for idx, event in enumerate(filtered_events):
-            time_str = datetime.datetime.fromtimestamp(event.timestamp).strftime("%Y-%m-%d %H:%M:%S")
+            start_time_str = datetime.datetime.fromtimestamp(event.start_time).strftime("%Y-%m-%d %H:%M:%S")
+            last_seen_str = datetime.datetime.fromtimestamp(event.last_seen_time).strftime("%H:%M:%S")
             conf_pct = int(event.confidence * 100)
             
             # Map visual color tags using standard Markdown colors
@@ -103,7 +103,12 @@ def render_page(gateway: BackendGateway) -> None:
                 EventType.CROWD: ":orange[● CROWD]",
                 EventType.FALL: ":cyan[● FALL]",
             }
-            type_badge = type_colors.get(event.event_type, f"● {event.event_type.value.upper()}")
+            
+            hazard_badges = []
+            for hz in getattr(event, "observed_hazards", [event.incident_type]):
+                badge = type_colors.get(hz, f"● {hz.value.upper()}")
+                hazard_badges.append(badge)
+            type_badge = " | ".join(hazard_badges)
             
             priority_colors = {
                 EventPriority.LOW: ":green[LOW]",
@@ -122,8 +127,8 @@ def render_page(gateway: BackendGateway) -> None:
                     st.markdown(f"Urgency: {priority_badge}")
                 
                 # Row 2: Timestamps and Description
-                st.caption(f"**Discovered:** {time_str} | **Event ID:** `{event.event_id}`")
-                st.markdown(f"**Incident Details:** {event.description}")
+                st.caption(f"**Discovered:** {start_time_str} | **Last Seen:** {last_seen_str} | **Duration:** {event.duration:.1f}s")
+                st.markdown(f"**Incident Details:** {event.description} (Detections count: **{event.detection_count}**)")
                 
                 # Row 3: Confidence score progress bar
                 st.caption(f"Confidence score: {conf_pct}%")
@@ -139,50 +144,50 @@ def render_page(gateway: BackendGateway) -> None:
                     
                 with col_status_input:
                     # Dropdown selectbox allowing manual lifecycle transitions
-                    current_idx = list(EventStatus).index(event.status)
+                    current_idx = list(IncidentState).index(event.status)
                     new_status = st.selectbox(
                         "Transition status:",
-                        options=list(EventStatus),
+                        options=list(IncidentState),
                         index=current_idx,
-                        key=f"status_select_{event.event_id}",
+                        key=f"status_select_{event.incident_id}",
                         format_func=lambda s: s.value.upper(),
                         label_visibility="collapsed"
                     )
                     # Automatically update backend status when selection changes
                     if new_status != event.status:
-                        success, msg = gateway.update_incident_status(event.event_id, new_status)
+                        success, msg = gateway.update_incident_status(event.incident_id, new_status.value)
                         if success:
                             st.success(msg)
                             st.rerun()
                         else:
                             st.error(msg)
-                            
+                             
                 with col_act_ev:
                     st.button(
                         "📁 Evidence",
-                        key=f"btn_ev_{event.event_id}",
+                        key=f"btn_ev_{event.incident_id}",
                         on_click=handle_incident_evidence,
-                        args=(event.event_id,),
+                        args=(event.incident_id,),
                         use_container_width=True
                     )
                         
                 with col_act_rep:
                     reports = gateway.get_reports()
-                    matching_report = next((r for r in reports if r.event_id == event.event_id), None)
+                    matching_report = next((r for r in reports if r.event_id == event.incident_id), None)
                     if matching_report:
                         st.button(
                             "📄 Report",
-                            key=f"btn_rep_{event.event_id}",
+                            key=f"btn_rep_{event.incident_id}",
                             on_click=handle_incident_report,
-                            args=(event.event_id, matching_report.report_id, False),
+                            args=(event.incident_id, matching_report.report_id, False),
                             use_container_width=True
                         )
                     else:
                         st.button(
                             "📄 Report",
-                            key=f"btn_rep_{event.event_id}",
+                            key=f"btn_rep_{event.incident_id}",
                             on_click=handle_incident_report,
-                            args=(event.event_id, "", True),
+                            args=(event.incident_id, "", True),
                             use_container_width=True
                         )
     else:

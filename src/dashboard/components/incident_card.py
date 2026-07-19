@@ -15,11 +15,11 @@ def handle_view_evidence(event_id: str) -> None:
     st.session_state.selected_event_id = event_id
 
 
-def render_incident_card(event: Event) -> None:
-    """Render a reusable incident event card.
+def render_incident_card(incident) -> None:
+    """Render a reusable incident card.
 
     Args:
-        event: The Event dataclass instance.
+        incident: The Incident instance.
     """
     # 1. Map incident type colors using standard Markdown color tokens
     type_colors = {
@@ -30,7 +30,12 @@ def render_incident_card(event: Event) -> None:
         EventType.CROWD: ":orange[● CROWD]",
         EventType.FALL: ":cyan[● FALL]",
     }
-    type_badge = type_colors.get(event.event_type, f"● {event.event_type.value.upper()}")
+    
+    hazard_badges = []
+    for hz in getattr(incident, "observed_hazards", [incident.incident_type]):
+        badge = type_colors.get(hz, f"● {hz.value.upper()}")
+        hazard_badges.append(badge)
+    type_badge = " | ".join(hazard_badges)
 
     # 2. Map priority/severity status colors
     severity_colors = {
@@ -39,13 +44,14 @@ def render_incident_card(event: Event) -> None:
         EventPriority.HIGH: ":red[HIGH]",
         EventPriority.CRITICAL: ":red[CRITICAL]",
     }
-    sev_badge = severity_colors.get(event.priority, event.priority.value.upper())
+    sev_badge = severity_colors.get(incident.priority, incident.priority.value.upper())
 
-    # 3. Format timestamp
-    time_str = datetime.datetime.fromtimestamp(event.timestamp).strftime("%Y-%m-%d %H:%M:%S")
+    # 3. Format timestamps
+    start_str = datetime.datetime.fromtimestamp(incident.start_time).strftime("%H:%M:%S")
+    last_str = datetime.datetime.fromtimestamp(incident.last_seen_time).strftime("%H:%M:%S")
 
     # 4. Confidence progress bar value
-    conf_pct = int(event.confidence * 100)
+    conf_pct = int(incident.confidence * 100)
 
     # 5. Render inside one clean container card (border=True)
     with st.container(border=True):
@@ -55,24 +61,25 @@ def render_incident_card(event: Event) -> None:
         with col_badge:
             st.markdown(sev_badge)
             
-        st.caption(f"**Camera Source:** {event.camera_id}")
-        st.caption(f"**Time:** {time_str}")
-        st.markdown(f"**Description:** {event.description}")
+        st.caption(f"**Camera Source:** {incident.camera_id}")
+        st.caption(f"**Discovered:** {start_str} | **Last Seen:** {last_str}")
+        st.caption(f"**Duration:** {incident.duration:.1f}s | **Detections count:** {incident.detection_count}")
+        st.markdown(f"**Description:** {incident.description}")
 
         # Confidence Bar
-        st.caption(f"Confidence score: {conf_pct}%")
-        st.progress(event.confidence)
+        st.caption(f"Latest Confidence score: {conf_pct}%")
+        st.progress(incident.confidence)
 
         # Footer Details and Action Redirect Button
         col_meta, col_btn = st.columns([3, 2])
         with col_meta:
-            st.caption(f"ID: `{event.event_id[:8]}`")
-            st.caption(f"Status: **{event.status.value.upper()}**")
+            st.caption(f"ID: `{incident.incident_id[:8]}`")
+            st.caption(f"Status: **{incident.status.value.upper()}**")
         with col_btn:
             st.button(
                 "View Evidence",
-                key=f"inc_action_view_{event.event_id}",
+                key=f"inc_action_view_{incident.incident_id}",
                 on_click=handle_view_evidence,
-                args=(event.event_id,),
+                args=(incident.incident_id,),
                 use_container_width=True
             )

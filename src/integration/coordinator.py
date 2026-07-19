@@ -74,10 +74,35 @@ class SystemCoordinator:
             self.detection_pipeline = DetectionPipeline(registry)
 
         self.event_manager = event_manager if event_manager is not None else EventManager()
-        self.decision_engine = decision_engine if decision_engine is not None else DecisionEngine()
+        
+        if decision_engine is not None:
+            self.decision_engine = decision_engine
+        else:
+            from src.decision.engine import DecisionEngine
+            from src.decision.rules import ConfidenceThresholdRule, SeverityCalculationRule, ActionDeterminationRule
+            # Custom rules to prevent duplicate suppression/cooldown logic inside DecisionEngine
+            custom_rules = [
+                ConfidenceThresholdRule(),
+                SeverityCalculationRule(),
+                ActionDeterminationRule(),
+            ]
+            self.decision_engine = DecisionEngine(rules=custom_rules)
+            
         self.evidence_manager = evidence_manager if evidence_manager is not None else EvidenceManager()
         self.report_manager = report_manager if report_manager is not None else ReportManager()
         self.alert_manager = alert_manager if alert_manager is not None else AlertManager()
+
+        # Instantiate IncidentManager
+        import os
+        from src.incident.manager import IncidentManager
+        cooldown_duration = float(os.environ.get("INCIDENT_COOLDOWN", "300.0"))
+        iou_threshold = float(os.environ.get("AREA_IOU_THRESHOLD", "0.40"))
+        centroid_distance_threshold = float(os.environ.get("CENTROID_DISTANCE_THRESHOLD", "120.0"))
+        self.incident_manager = IncidentManager(
+            cooldown_duration=cooldown_duration,
+            iou_threshold=iou_threshold,
+            centroid_distance_threshold=centroid_distance_threshold,
+        )
 
         # Instantiate helper tools
         self.validator = SystemValidator()
@@ -169,6 +194,11 @@ class SystemCoordinator:
             self.alert_manager.clear()
         except Exception as e:
             logger.error("Error clearing AlertManager: %s", e)
+
+        try:
+            self.incident_manager.clear()
+        except Exception as e:
+            logger.error("Error clearing IncidentManager: %s", e)
 
         self._started = False
 

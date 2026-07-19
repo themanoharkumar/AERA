@@ -90,8 +90,10 @@ class UltralyticsYOLOModel(BaseModel):
     """Shared Ultralytics YOLO model wrapper to perform thread-safe cached inference."""
 
     def __init__(self, model_path: str) -> None:
+        import threading
         self.model_path = model_path
         self._released = False
+        self._lock = threading.Lock()
         
         # Cache to prevent running inference twice on the same frame object
         self._last_frame_id: Optional[int] = None
@@ -119,68 +121,69 @@ class UltralyticsYOLOModel(BaseModel):
         if self._released:
             raise RuntimeError("YOLO model has been released.")
             
-        frame_id = id(frame)
-        if frame_id == self._last_frame_id and self._last_predictions is not None:
-            return self._last_predictions
-
-        # Check for simulated test frames to support unit/integration tests and simulation triggers
-        if frame.shape == (100, 100, 3):
-            # Check fire frame heuristic
-            if frame[50, 50, 2] >= 250 and frame[50, 50, 0] <= 10:
-                logger.info("YOLO Model: Simulated Fire frame detected in test/simulation mode.")
-                return [{
-                    "label": "fire",
-                    "confidence": 0.95,
-                    "bounding_box": (10, 10, 90, 90),
-                    "inference_time": 0.001
-                }]
-            # Check smoke frame heuristic
-            elif frame[50, 50, 0] == 150 and frame[50, 50, 1] == 150 and frame[50, 50, 2] == 150:
-                logger.info("YOLO Model: Simulated Smoke frame detected in test/simulation mode.")
-                return [{
-                    "label": "smoke",
-                    "confidence": 0.85,
-                    "bounding_box": (0, 0, 100, 100),
-                    "inference_time": 0.001
-                }]
-
-        # Run inference using loaded weights
-        try:
-            start_time = time.time()
-            results = self.model(frame, verbose=False)
-            inference_time = time.time() - start_time
-            
-            predictions = []
-            if results and len(results) > 0:
-                result = results[0]
-                boxes = result.boxes
-                names = result.names
+        with self._lock:
+            frame_id = id(frame)
+            if frame_id == self._last_frame_id and self._last_predictions is not None:
+                return self._last_predictions
+ 
+            # Check for simulated test frames to support unit/integration tests and simulation triggers
+            if frame.shape == (100, 100, 3):
+                # Check fire frame heuristic
+                if frame[50, 50, 2] >= 250 and frame[50, 50, 0] <= 10:
+                    logger.info("YOLO Model: Simulated Fire frame detected in test/simulation mode.")
+                    return [{
+                        "label": "fire",
+                        "confidence": 0.95,
+                        "bounding_box": (10, 10, 90, 90),
+                        "inference_time": 0.001
+                    }]
+                # Check smoke frame heuristic
+                elif frame[50, 50, 0] == 150 and frame[50, 50, 1] == 150 and frame[50, 50, 2] == 150:
+                    logger.info("YOLO Model: Simulated Smoke frame detected in test/simulation mode.")
+                    return [{
+                        "label": "smoke",
+                        "confidence": 0.85,
+                        "bounding_box": (0, 0, 100, 100),
+                        "inference_time": 0.001
+                    }]
+ 
+            # Run inference using loaded weights
+            try:
+                start_time = time.time()
+                results = self.model(frame, verbose=False)
+                inference_time = time.time() - start_time
                 
-                for box in boxes:
-                    xyxy = box.xyxy[0].tolist()
-                    conf = float(box.conf[0])
-                    cls_id = int(box.cls[0])
-                    label = names.get(cls_id, f"unknown_{cls_id}").lower()
+                predictions = []
+                if results and len(results) > 0:
+                    result = results[0]
+                    boxes = result.boxes
+                    names = result.names
                     
-                    predictions.append({
-                        "label": label,
-                        "confidence": conf,
-                        "bounding_box": (int(xyxy[0]), int(xyxy[1]), int(xyxy[2]), int(xyxy[3])),
-                        "inference_time": inference_time
-                    })
-            
-            self._last_frame_id = frame_id
-            self._last_predictions = predictions
-            
-            # Log inference info
-            logger.info(
-                "YOLO Inference: Processed frame ID %s | Device: %s | Time: %.1fms | Detections: %d",
-                frame_id, self.device, inference_time * 1000, len(predictions)
-            )
-            return predictions
-        except Exception as e:
-            logger.error("YOLO Inference Error: Run failed: %s", e)
-            raise InferenceError(f"YOLO inference runtime error: {e}") from e
+                    for box in boxes:
+                        xyxy = box.xyxy[0].tolist()
+                        conf = float(box.conf[0])
+                        cls_id = int(box.cls[0])
+                        label = names.get(cls_id, f"unknown_{cls_id}").lower()
+                        
+                        predictions.append({
+                            "label": label,
+                            "confidence": conf,
+                            "bounding_box": (int(xyxy[0]), int(xyxy[1]), int(xyxy[2]), int(xyxy[3])),
+                            "inference_time": inference_time
+                        })
+                
+                self._last_frame_id = frame_id
+                self._last_predictions = predictions
+                
+                # Log inference info
+                logger.info(
+                    "YOLO Inference: Processed frame ID %s | Device: %s | Time: %.1fms | Detections: %d",
+                    frame_id, self.device, inference_time * 1000, len(predictions)
+                )
+                return predictions
+            except Exception as e:
+                logger.error("YOLO Inference Error: Run failed: %s", e)
+                raise InferenceError(f"YOLO inference runtime error: {e}") from e
 
     def release(self) -> None:
         """Release underlying model resources."""

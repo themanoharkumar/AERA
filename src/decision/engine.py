@@ -63,7 +63,7 @@ class DecisionEngine:
         self._last_escalation_times: Dict[Tuple[str, str], float] = {}
         self._lock = threading.Lock()
 
-    def evaluate_event(self, event: Event) -> DecisionResult:
+    def evaluate_event(self, event: Event, decision_id: Optional[str] = None) -> DecisionResult:
         """Evaluate an incoming Event against rules and policy.
 
         Runs the event sequentially through the rules pipeline, records it in history,
@@ -104,7 +104,7 @@ class DecisionEngine:
 
             # Generate standardized result
             result = DecisionResult(
-                decision_id=str(uuid.uuid4()),
+                decision_id=decision_id if decision_id is not None else str(uuid.uuid4()),
                 event_id=event.event_id,
                 severity=context["severity"],
                 action=context["action"],

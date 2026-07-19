@@ -270,27 +270,27 @@ class BackendGateway:
 
     # ── Incident Services ────────────────────────────────────────────────
 
-    def get_incidents(self, filter_status: Optional[str] = None, severity: Optional[str] = None) -> List[Event]:
-        """Retrieve all events/incidents from EventManager with optional filters."""
+    def get_incidents(self, filter_status: Optional[str] = None, severity: Optional[str] = None) -> List[Any]:
+        """Retrieve all incidents from IncidentManager with optional filters."""
         try:
-            events = self.coordinator.event_manager.list_events()
-            filtered = events
+            incidents = self.coordinator.incident_manager.list_incidents()
+            filtered = incidents
             if filter_status:
-                filtered = [e for e in filtered if e.status.value.upper() == filter_status.upper()]
+                filtered = [i for i in filtered if i.status.value.upper() == filter_status.upper()]
             if severity:
-                filtered = [e for e in filtered if e.priority.value.upper() == severity.upper()]
+                filtered = [i for i in filtered if i.priority.value.upper() == severity.upper()]
             
-            # Sort chronologically descending
-            filtered.sort(key=lambda x: x.timestamp, reverse=True)
+            # Sort chronologically descending by last seen time
+            filtered.sort(key=lambda x: x.last_seen_time, reverse=True)
             return filtered
         except Exception as e:
             logger.error("Failed to get incidents list: %s", e)
             return []
 
-    def get_incident(self, event_id: str) -> Optional[Event]:
+    def get_incident(self, event_id: str) -> Optional[Any]:
         """Retrieve a specific incident."""
         try:
-            return self.coordinator.event_manager.get_event(event_id)
+            return self.coordinator.incident_manager.get_incident(event_id)
         except Exception:
             return None
 
@@ -300,11 +300,41 @@ class BackendGateway:
             val_str = status_str.upper()
             if val_str == "CLOSED":
                 val_str = "RESOLVED"
-            status_enum = EventStatus(val_str)
-            self.coordinator.event_manager.update_event(event_id, status=status_enum)
-            return True, f"Incident {event_id} status updated to {status_enum.value}."
+            elif val_str in ("PROCESSING", "VERIFIED"):
+                val_str = "ACTIVE"
+            elif val_str == "FAILED":
+                val_str = "RESOLVED"
+                
+            from src.incident.incident import IncidentState
+            status_enum = IncidentState(val_str)
+            inc = self.coordinator.incident_manager.get_incident(event_id)
+            if inc:
+                inc.status = status_enum
+                # Also update corresponding event status for backward compatibility
+                try:
+                    from src.event.status import EventStatus
+                    evt_status = EventStatus.RESOLVED if val_str == "RESOLVED" else EventStatus.PROCESSING
+                    self.coordinator.event_manager.update_event(
+                        event_id,
+                        status=evt_status
+                    )
+                except Exception:
+                    pass
+                return True, f"Incident {event_id} status updated to {status_enum.value}."
+            else:
+                # Fallback to updating EventManager directly for legacy compatibility
+                try:
+                    from src.event.status import EventStatus
+                    evt_status = EventStatus.RESOLVED if val_str == "RESOLVED" else EventStatus.PROCESSING
+                    self.coordinator.event_manager.update_event(
+                        event_id,
+                        status=evt_status
+                    )
+                    return True, f"Event {event_id} status updated in EventManager."
+                except Exception as e_evt:
+                    return False, f"Incident {event_id} not found and event update failed: {e_evt}"
         except Exception as e:
-            logger.error("Failed to update status for event %s: %s", event_id, e)
+            logger.error("Failed to update status for incident %s: %s", event_id, e)
             return False, f"Update failed: {e}"
 
     # ── Evidence Services ────────────────────────────────────────────────
