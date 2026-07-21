@@ -1,0 +1,6 @@
+# AERA Cloud Production Requirements
+fastapi
+uvicorn
+pydantic
+sqlalchemy
+alembic

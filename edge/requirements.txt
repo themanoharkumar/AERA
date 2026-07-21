@@ -1,0 +1,86 @@
+# ==========================
+# AERA - AI Emergency Response Assistant
+# Production Requirements
+# ==========================
+
+# ---------- Core ----------
+numpy
+pandas
+scipy
+
+# ---------- Computer Vision ----------
+opencv-python
+opencv-contrib-python
+ultralytics
+mediapipe
+Pillow
+
+# ---------- Deep Learning ----------
+torch
+torchvision
+torchaudio
+
+# ---------- Machine Learning ----------
+scikit-learn
+xgboost
+lightgbm
+joblib
+
+# ---------- NLP ----------
+spacy
+transformers
+sentence-transformers
+nltk
+
+# ---------- Visualization ----------
+matplotlib
+seaborn
+plotly
+
+# ---------- Dashboard ----------
+streamlit
+
+# ---------- Backend ----------
+fastapi
+uvicorn
+python-multipart
+pydantic
+
+# ---------- Database ----------
+sqlalchemy
+alembic
+
+# ---------- Configuration ----------
+PyYAML
+python-dotenv
+
+# ---------- Networking ----------
+requests
+httpx
+
+# ---------- Notifications ----------
+python-telegram-bot
+
+# ---------- Utilities ----------
+tqdm
+rich
+loguru
+psutil
+
+# ---------- Video ----------
+imageio
+imageio-ffmpeg
+
+# ---------- Testing ----------
+pytest
+pytest-cov
+
+# ---------- Code Quality ----------
+black
+isort
+flake8
+mypy
+
+# ---------- Documentation ----------
+mkdocs
+mkdocs-material

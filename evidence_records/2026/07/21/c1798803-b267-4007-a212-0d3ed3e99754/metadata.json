@@ -1,0 +1,45 @@
+{
+    "camera_id": "webcam_0",
+    "event_id": "c1798803-b267-4007-a212-0d3ed3e99754",
+    "decision_id": "dbd31cc8-5db5-49e6-8ca2-7ee76dbdff77",
+    "timestamp": 1784645458.236526,
+    "detector_name": "smoke_detector",
+    "file_size": 127313,
+    "resolution": [
+        1280,
+        720
+    ],
+    "custom_metadata": {
+        "detector_confidence": 0.5060562491416931,
+        "label": "smoke",
+        "camera_name": "Webcam Feed",
+        "bounding_boxes": [
+            [
+                645,
+                97,
+                799,
+                300
+            ]
+        ],
+        "model_metadata": {
+            "model_path": "ai/models/fire_smoke_v1.pt",
+            "device": "cpu"
+        },
+        "observed_hazards": [
+            "SMOKE",
+            "FIRE"
+        ],
+        "original_image_path": "D:/PROJECTS/AERA/evidence_records/2026/07/21/c1798803-b267-4007-a212-0d3ed3e99754/original.jpg",
+        "last_seen_time": 1784645474.0531018,
+        "detection_count": 25,
+        "latest_confidence": 0.4968293011188507,
+        "latest_bounding_box": [
+            1061,
+            92,
+            1119,
+            215
+        ],
+        "duration": 15.816575765609741,
+        "latest_image_path": "D:/PROJECTS/AERA/evidence_records/2026/07/21/c1798803-b267-4007-a212-0d3ed3e99754/latest.jpg"
+    }
+}

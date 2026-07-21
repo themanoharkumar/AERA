@@ -1,0 +1,15 @@
+{
+    "camera_id": "webcam_0",
+    "event_id": "5f0f3e24-cfbf-456f-8ccf-84d12be4d1db",
+    "decision_id": "5fc406f9-0d59-4948-85fe-f7ad6883baf5",
+    "timestamp": 1784644537.426756,
+    "detector_name": "AI_Manual_Compile",
+    "file_size": 0,
+    "resolution": [
+        0,
+        0
+    ],
+    "custom_metadata": {
+        "camera_name": "Webcam Feed"
+    }
+}
